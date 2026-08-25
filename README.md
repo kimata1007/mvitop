@@ -54,12 +54,6 @@ brew update
 brew upgrade mvitop
 ```
 
-Rust users can instead build and install the published crate:
-
-```sh
-cargo install mvitop --locked
-```
-
 Versioned Apple Silicon archives and SHA-256 checksums are also available from [GitHub Releases](https://github.com/kimata1007/mvitop/releases). Release archives include GitHub artifact attestations that can be verified with:
 
 ```sh
