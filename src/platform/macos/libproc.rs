@@ -7,6 +7,7 @@ use std::mem::{MaybeUninit, size_of};
 
 const PROC_PIDTBSDINFO: i32 = 3;
 const PROC_PIDTASKINFO: i32 = 4;
+const PROC_PIDVNODEPATHINFO: i32 = 9;
 const RUSAGE_INFO_V4: i32 = 4;
 const PROC_PIDPATHINFO_MAXSIZE: usize = 4_096;
 
@@ -101,6 +102,20 @@ pub struct RusageInfoV4 {
     pub runnable_time: u64,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct VnodeInfoPath {
+    vnode_info: [u8; 152],
+    path: [libc::c_char; 1024],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct VnodePathInfo {
+    current_directory: VnodeInfoPath,
+    root_directory: VnodeInfoPath,
+}
+
 unsafe extern "C" {
     fn proc_listallpids(buffer: *mut libc::c_void, buffer_size: i32) -> i32;
     fn proc_pidinfo(
@@ -182,6 +197,11 @@ pub fn executable(pid: i32) -> io::Result<String> {
         .into_owned())
 }
 
+pub fn current_directory(pid: i32) -> io::Result<String> {
+    let info: VnodePathInfo = pid_info(pid, PROC_PIDVNODEPATHINFO)?;
+    Ok(sysctl::c_string(&info.current_directory.path))
+}
+
 pub fn username(uid: u32) -> String {
     let mut pwd = MaybeUninit::<libc::passwd>::uninit();
     let mut result = std::ptr::null_mut();
@@ -215,5 +235,6 @@ mod tests {
         assert_eq!(bsd_info(pid).unwrap().pid, pid as u32);
         assert!(task_info(pid).unwrap().thread_count > 0);
         assert!(!executable(pid).unwrap().is_empty());
+        assert!(!current_directory(pid).unwrap().is_empty());
     }
 }

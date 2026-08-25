@@ -19,15 +19,10 @@ pub fn collect(history: &mut History) -> io::Result<MemorySample> {
     let free = stats.free_count as u64 * page;
     let inactive = stats.inactive_count as u64 * page;
     let purgeable = stats.purgeable_count as u64 * page;
-    let available = free
-        .saturating_add(inactive)
-        .saturating_add(purgeable)
-        .min(total);
-    let used = total.saturating_sub(available);
+    let (available, used) = calculate_usage(total, free, inactive, purgeable);
     let wired = stats.wire_count as u64 * page;
     let compressed = stats.compressor_page_count as u64 * page;
     let cached = inactive.saturating_add(purgeable);
-    let pressure_percent = pressure(total, stats.active_count as u64 * page, wired, compressed);
     let swap = sysctl::value::<SwapUsage>("vm.swapusage").unwrap_or_default();
     history.push(used as f64 * 100.0 / total.max(1) as f64);
     Ok(MemorySample {
@@ -39,27 +34,27 @@ pub fn collect(history: &mut History) -> io::Result<MemorySample> {
         cached,
         swap_used: swap.used,
         swap_total: swap.total,
-        pressure_percent,
+        // macOS exposes no stable unprivileged numeric pressure API. Do not
+        // mislabel a Linux-style used-memory ratio as memory pressure.
+        pressure_percent: None,
         history: history.clone(),
     })
 }
 
-pub fn pressure(total: u64, active: u64, wired: u64, compressed: u64) -> f64 {
-    if total == 0 {
-        return 0.0;
-    }
-    ((active.saturating_add(wired).saturating_add(compressed)).min(total) as f64 * 100.0
-        / total as f64)
-        .clamp(0.0, 100.0)
+pub fn calculate_usage(total: u64, free: u64, inactive: u64, purgeable: u64) -> (u64, u64) {
+    let available = free
+        .saturating_add(inactive)
+        .saturating_add(purgeable)
+        .min(total);
+    (available, total.saturating_sub(available))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn memory_pressure_is_bounded() {
-        assert_eq!(pressure(100, 50, 30, 10), 90.0);
-        assert_eq!(pressure(100, 100, 100, 100), 100.0);
-        assert_eq!(pressure(0, 1, 1, 1), 0.0);
+    fn calculates_available_and_used_memory() {
+        assert_eq!(calculate_usage(100, 10, 20, 5), (35, 65));
+        assert_eq!(calculate_usage(100, 80, 80, 80), (100, 0));
     }
 }
