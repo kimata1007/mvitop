@@ -100,12 +100,12 @@ jobs:
 
       - name: Request immediate Homebrew update
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_AUTOMATION_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "${GH_TOKEN:-}" ]]; then
-            echo "::notice::RELEASE_AUTOMATION_TOKEN is not configured; the tap's scheduled updater will pick up this release"
+            echo "::notice::HOMEBREW_TAP_TOKEN is not configured; the tap's scheduled updater will pick up this release"
             exit 0
           fi
           gh api \

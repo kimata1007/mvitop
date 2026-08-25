@@ -159,7 +159,12 @@ Changes land through normal pull requests using Conventional Commit prefixes suc
 
 Merging the release pull request creates the version tag and GitHub Release. A separate macOS workflow then verifies the tag against the Cargo package version, runs the full checks, builds and attests the Apple Silicon archive, attaches it to the release, and requests an immediate update from `kimata1007/homebrew-tap`.
 
-Release automation uses one `RELEASE_AUTOMATION_TOKEN` Actions secret instead of granting the repository-wide `GITHUB_TOKEN` permission to approve pull requests. It should be a fine-grained token scoped only to `kimata1007/mvitop` and `kimata1007/homebrew-tap`, with Contents read/write on both repositories plus Pull requests and Issues read/write on mvitop. If cross-repository dispatch is temporarily unavailable, the tap's scheduled updater checks the latest signed release every six hours and provides an automatic fallback.
+Release automation uses two narrowly scoped Actions secrets instead of granting the repository-wide `GITHUB_TOKEN` permission to approve pull requests:
+
+- `RELEASE_PLEASE_TOKEN`: a fine-grained token scoped only to `kimata1007/mvitop`, with Contents, Pull requests, and Issues read/write.
+- `HOMEBREW_TAP_TOKEN`: a fine-grained token scoped only to `kimata1007/homebrew-tap`, with Contents read/write for repository dispatch.
+
+If cross-repository dispatch is temporarily unavailable, the tap's scheduled updater checks the latest signed release every six hours and provides an automatic fallback.
 
 ## License
 

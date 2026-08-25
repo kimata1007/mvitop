@@ -20,11 +20,11 @@ jobs:
     steps:
       - name: Require scoped release token
         env:
-          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_AUTOMATION_TOKEN }}
+          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         shell: bash
         run: |
-          if [[ -z "${RELEASE_AUTOMATION_TOKEN:-}" ]]; then
-            echo "RELEASE_AUTOMATION_TOKEN is required for release PRs" >&2
+          if [[ -z "${RELEASE_PLEASE_TOKEN:-}" ]]; then
+            echo "RELEASE_PLEASE_TOKEN is required for release PRs" >&2
             exit 1
           fi
 
@@ -34,7 +34,7 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          token: ${{ secrets.RELEASE_AUTOMATION_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
       - name: Start signed release build
         if: ${{ steps.release.outputs.release_created == 'true' }}
