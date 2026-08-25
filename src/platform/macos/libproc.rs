@@ -117,7 +117,6 @@ struct VnodePathInfo {
 }
 
 unsafe extern "C" {
-    fn proc_listallpids(buffer: *mut libc::c_void, buffer_size: i32) -> i32;
     fn proc_pidinfo(
         pid: i32,
         flavor: i32,
@@ -127,26 +126,6 @@ unsafe extern "C" {
     ) -> i32;
     fn proc_pidpath(pid: i32, buffer: *mut libc::c_void, buffer_size: u32) -> i32;
     fn proc_pid_rusage(pid: i32, flavor: i32, buffer: *mut RusageInfoV4) -> i32;
-}
-
-pub fn all_pids() -> io::Result<Vec<i32>> {
-    let capacity = sysctl::value::<i32>("kern.maxproc")
-        .unwrap_or(4096)
-        .max(1024) as usize;
-    let mut pids = vec![0i32; capacity];
-    // SAFETY: pids is a writable buffer of the supplied byte size.
-    let count = unsafe {
-        proc_listallpids(
-            pids.as_mut_ptr().cast(),
-            (pids.len() * size_of::<i32>()) as i32,
-        )
-    };
-    if count < 0 {
-        return Err(io::Error::last_os_error());
-    }
-    pids.truncate(count as usize);
-    pids.retain(|pid| *pid > 0);
-    Ok(pids)
 }
 
 fn pid_info<T: Copy>(pid: i32, flavor: i32) -> io::Result<T> {

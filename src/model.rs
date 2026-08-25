@@ -77,6 +77,7 @@ pub struct ProcessInfo {
     pub name: String,
     pub executable: String,
     pub command: String,
+    pub gpu_time_ms_per_s: f64,
     pub cpu_percent: f64,
     pub memory_bytes: u64,
     pub memory_percent: f64,

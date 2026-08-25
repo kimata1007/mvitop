@@ -1,5 +1,6 @@
 pub mod cpu;
 pub mod gpu;
+pub mod gpu_process;
 pub mod memory;
 pub mod process;
 pub mod runtime;

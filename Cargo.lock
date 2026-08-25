@@ -270,6 +270,7 @@ dependencies = [
  "ratatui",
  "signal-hook",
  "unicode-width 0.2.0",
+ "xml-rs",
 ]
 
 [[package]]
@@ -623,3 +624,9 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "xml-rs"
+version = "0.8.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"

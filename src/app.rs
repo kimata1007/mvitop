@@ -15,6 +15,7 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use signal_hook::consts::{SIGINT, SIGTERM};
 use std::io::{self, IsTerminal};
+use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant, UNIX_EPOCH};
@@ -55,6 +56,7 @@ impl SnapshotSource {
 }
 
 fn run_tui(demo: bool) -> anyhow::Result<()> {
+    let gpu_process_access = demo || authorize_gpu_processes();
     let started = Instant::now();
     install_panic_restore();
     let _guard = TerminalGuard::enter()?;
@@ -71,7 +73,7 @@ fn run_tui(demo: bool) -> anyhow::Result<()> {
     let mut source = if demo {
         SnapshotSource::Demo(DemoRuntime::new())
     } else {
-        SnapshotSource::Live(MetricsRuntime::start())
+        SnapshotSource::Live(MetricsRuntime::start(gpu_process_access))
     };
     let stopping = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(SIGINT, stopping.clone()).context("register SIGINT")?;
@@ -95,6 +97,29 @@ fn run_tui(demo: bool) -> anyhow::Result<()> {
     drop(source);
     let _ = first_draw;
     Ok(())
+}
+
+fn authorize_gpu_processes() -> bool {
+    if unsafe { libc::geteuid() } == 0 {
+        return true;
+    }
+    if Command::new("/usr/bin/sudo")
+        .args(["-n", "true"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+    {
+        return true;
+    }
+    eprintln!(
+        "mvitop needs administrator authorization to read per-process GPU time.\nOnly /usr/bin/powermetrics will run with elevated privileges."
+    );
+    Command::new("/usr/bin/sudo")
+        .arg("-v")
+        .status()
+        .is_ok_and(|status| status.success())
 }
 
 fn handle_key(
@@ -334,7 +359,7 @@ fn startup_benchmark() -> anyhow::Result<()> {
     terminal.draw(|frame| crate::ui::render(frame, &Snapshot::default(), &ViewState::default()))?;
     let first_frame = started.elapsed();
     let runtime_started = Instant::now();
-    let runtime = MetricsRuntime::start();
+    let runtime = MetricsRuntime::start(false);
     let runtime_ready = runtime_started.elapsed();
     let deadline = started + Duration::from_secs(5);
     let snapshot = loop {

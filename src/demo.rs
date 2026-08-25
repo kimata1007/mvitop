@@ -177,6 +177,12 @@ fn synthetic_processes(phase: f64, total_memory: u64) -> Vec<ProcessInfo> {
                     name: name.into(),
                     executable: format!("/opt/demo/bin/{name}"),
                     command: command.into(),
+                    gpu_time_ms_per_s: wave(
+                        phase + index as f64 * 0.41,
+                        210.0 / 10.0 + index as f64 * 3.0,
+                        12.0,
+                        0.9,
+                    ) * 10.0,
                     cpu_percent: cpu,
                     memory_bytes: memory,
                     memory_percent: memory as f64 * 100.0 / total_memory as f64,

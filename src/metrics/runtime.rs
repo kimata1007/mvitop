@@ -1,5 +1,6 @@
 use crate::metrics::cpu::CpuCollector;
 use crate::metrics::gpu::{GpuBackend, UnavailableGpu};
+use crate::metrics::gpu_process::PowermetricsSampler;
 use crate::metrics::process::ProcessCollector;
 use crate::metrics::{memory, system};
 use crate::model::{History, Snapshot};
@@ -12,7 +13,6 @@ use std::time::{Duration, SystemTime};
 const CPU_INTERVAL: Duration = Duration::from_millis(500);
 const MEMORY_INTERVAL: Duration = Duration::from_millis(500);
 const GPU_INTERVAL: Duration = Duration::from_millis(350);
-const PROCESS_INTERVAL: Duration = Duration::from_secs(1);
 const SLOW_INTERVAL: Duration = Duration::from_secs(15);
 
 type SharedSnapshot = Arc<ArcSwap<Snapshot>>;
@@ -27,14 +27,14 @@ pub struct MetricsRuntime {
 impl MetricsRuntime {
     /// Returns immediately with an empty snapshot. Every potentially slow
     /// collector is initialized on its own worker after the first UI draw.
-    pub fn start() -> Self {
+    pub fn start(gpu_process_access: bool) -> Self {
         let snapshot = Arc::new(ArcSwap::from_pointee(Snapshot::default()));
         let shutdown = Arc::new((Mutex::new(false), Condvar::new()));
         let threads = vec![
             spawn_system(snapshot.clone(), shutdown.clone()),
             spawn_cpu(snapshot.clone(), shutdown.clone()),
             spawn_memory(snapshot.clone(), shutdown.clone()),
-            spawn_processes(snapshot.clone(), shutdown.clone()),
+            spawn_processes(snapshot.clone(), shutdown.clone(), gpu_process_access),
             spawn_gpu(snapshot.clone(), shutdown.clone()),
         ];
         Self {
@@ -87,6 +87,23 @@ fn run_periodically(shutdown: &Shutdown, interval: Duration, mut sample: impl Fn
             break;
         }
     }
+}
+
+fn is_stopped(shutdown: &Shutdown) -> bool {
+    shutdown.0.lock().map(|stopped| *stopped).unwrap_or(true)
+}
+
+fn wait_for_shutdown(shutdown: &Shutdown, interval: Duration) -> bool {
+    let (lock, wake) = &**shutdown;
+    let Ok(stopped) = lock.lock() else {
+        return true;
+    };
+    if *stopped {
+        return true;
+    }
+    wake.wait_timeout(stopped, interval)
+        .map(|(stopped, _)| *stopped)
+        .unwrap_or(true)
 }
 
 fn named_thread(name: &str, task: impl FnOnce() + Send + 'static) -> JoinHandle<()> {
@@ -148,24 +165,53 @@ fn spawn_memory(shared: SharedSnapshot, shutdown: Shutdown) -> JoinHandle<()> {
     })
 }
 
-fn spawn_processes(shared: SharedSnapshot, shutdown: Shutdown) -> JoinHandle<()> {
+fn spawn_processes(
+    shared: SharedSnapshot,
+    shutdown: Shutdown,
+    gpu_process_access: bool,
+) -> JoinHandle<()> {
     named_thread("process", move || {
+        if !gpu_process_access {
+            update(&shared, |snapshot| {
+                snapshot.status.process_error =
+                    Some("GPU process monitoring needs administrator authorization".into())
+            });
+            return;
+        }
         let mut collector = ProcessCollector::default();
-        run_periodically(&shutdown, PROCESS_INTERVAL, || {
-            let total_memory = shared.load().memory.total;
-            match collector.sample(total_memory) {
-                Ok(processes) => {
-                    let processes = Arc::new(processes);
-                    update(&shared, |snapshot| {
-                        snapshot.processes = processes.clone();
-                        snapshot.status.process_error = None;
-                    });
-                }
+        while !is_stopped(&shutdown) {
+            match PowermetricsSampler::start() {
+                Ok(mut sampler) => loop {
+                    match sampler.next_sample() {
+                        Ok(activities) => {
+                            let total_memory = shared.load().memory.total;
+                            let processes = Arc::new(collector.sample(total_memory, &activities));
+                            update(&shared, |snapshot| {
+                                snapshot.processes = processes.clone();
+                                snapshot.status.process_error = None;
+                            });
+                        }
+                        Err(error) => {
+                            update(&shared, |snapshot| {
+                                snapshot.status.process_error = Some(error.to_string())
+                            });
+                            break;
+                        }
+                    }
+                    if is_stopped(&shutdown) {
+                        break;
+                    }
+                },
                 Err(error) => update(&shared, |snapshot| {
-                    snapshot.status.process_error = Some(error.to_string())
+                    snapshot.status.process_error = Some(format!(
+                        "cannot start privileged GPU process sampler: {error}"
+                    ))
                 }),
             }
-        });
+            if wait_for_shutdown(&shutdown, Duration::from_secs(1)) {
+                break;
+            }
+        }
     })
 }
 
@@ -207,7 +253,7 @@ mod tests {
     use super::*;
     #[test]
     fn runtime_publishes_without_waiting_for_all_collectors() {
-        let runtime = MetricsRuntime::start();
+        let runtime = MetricsRuntime::start(false);
         for _ in 0..100 {
             if runtime.snapshot().memory.total > 0 {
                 break;
