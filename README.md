@@ -35,22 +35,47 @@ The MIT license in this repository applies to mvitop's independently authored co
 ## Requirements
 
 - An Apple Silicon Mac
-- macOS with the Xcode Command Line Tools
-- Rust 1.85 or newer
+- macOS
 
-## Build and install
+No administrator privileges, Rust toolchain, or Xcode installation is required when installing the prebuilt release with Homebrew.
+
+## Install
+
+Homebrew is the recommended installation method:
+
+```sh
+brew install kimata1007/tap/mvitop
+```
+
+Homebrew will keep the tap and package up to date through the usual commands:
+
+```sh
+brew update
+brew upgrade mvitop
+```
+
+Rust users can instead build and install the published crate:
+
+```sh
+cargo install mvitop --locked
+```
+
+Versioned Apple Silicon archives and SHA-256 checksums are also available from [GitHub Releases](https://github.com/kimata1007/mvitop/releases). Release archives include GitHub artifact attestations that can be verified with:
+
+```sh
+gh attestation verify mvitop-v*-aarch64-apple-darwin.tar.gz \
+  --repo kimata1007/mvitop
+```
+
+## Build from source
+
+Building requires macOS with the Xcode Command Line Tools and Rust 1.85 or newer.
 
 ```sh
 git clone https://github.com/kimata1007/mvitop.git
 cd mvitop
 cargo build --release
 install -m 755 target/release/mvitop /usr/local/bin/mvitop
-```
-
-For a user-local Cargo installation:
-
-```sh
-cargo install --path .
 ```
 
 Run it in an interactive terminal:
