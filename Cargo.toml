@@ -5,7 +5,13 @@ edition = "2024"
 rust-version = "1.85"
 description = "A fast native terminal system monitor for Apple Silicon Macs"
 license = "MIT"
+homepage = "https://github.com/kimata1007/mvitop"
 repository = "https://github.com/kimata1007/mvitop"
+readme = "README.md"
+keywords = ["macos", "apple-silicon", "system-monitor", "gpu", "tui"]
+categories = ["command-line-utilities", "hardware-support"]
+publish = ["crates-io"]
+include = ["src/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE"]
 
 [dependencies]
 anyhow = "1.0"
