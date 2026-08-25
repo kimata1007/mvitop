@@ -5,5 +5,6 @@ mod model;
 mod platform;
 mod ui;
 
-fn main() -> anyhow::Result<()> { app::run() }
-
+fn main() -> anyhow::Result<()> {
+    app::run()
+}
