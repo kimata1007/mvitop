@@ -24,6 +24,10 @@ pub fn run() -> anyhow::Result<()> {
         print_help();
         return Ok(());
     }
+    if args.iter().any(|arg| arg == "--version" || arg == "-V") {
+        println!("mvitop {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
     if args.iter().any(|arg| arg == "--startup-benchmark") {
         return startup_benchmark();
     }

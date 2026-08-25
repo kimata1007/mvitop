@@ -160,7 +160,7 @@ pub fn visible<'a>(
     items
 }
 
-fn tree_order<'a>(items: Vec<&'a ProcessInfo>) -> Vec<&'a ProcessInfo> {
+fn tree_order(items: Vec<&ProcessInfo>) -> Vec<&ProcessInfo> {
     use std::collections::{HashMap, HashSet};
     let pids: HashSet<i32> = items.iter().map(|process| process.pid).collect();
     let mut children: HashMap<i32, Vec<&ProcessInfo>> = HashMap::new();

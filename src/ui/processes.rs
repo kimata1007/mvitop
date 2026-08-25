@@ -98,11 +98,3 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot, view: &Vie
     });
     frame.render_stateful_widget(table, area, &mut state);
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn responsive_thresholds_are_ordered() {
-        assert!(100 > 72);
-    }
-}

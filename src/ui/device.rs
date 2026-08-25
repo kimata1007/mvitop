@@ -48,11 +48,23 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot) {
         (Some(p), Some(e)) => format!(" P:{p} E:{e}"),
         _ => String::new(),
     };
+    let per_core = if area.width >= 100 && !snapshot.cpu.per_core_percent.is_empty() {
+        let values = snapshot
+            .cpu
+            .per_core_percent
+            .iter()
+            .enumerate()
+            .map(|(index, value)| format!(" {index}:{value:.0}"))
+            .collect::<String>();
+        format!("  cores[{values} ]")
+    } else {
+        String::new()
+    };
     frame.render_widget(
         gauge(
             snapshot.cpu.total_percent,
             format!(
-                "CPU {:>4.0}%  {} cores{clusters}",
+                "CPU {:>4.0}%  {} cores{clusters}{per_core}",
                 snapshot.cpu.total_percent,
                 snapshot.cpu.per_core_percent.len()
             ),
