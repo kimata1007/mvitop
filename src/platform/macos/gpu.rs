@@ -3,7 +3,7 @@ use crate::model::{GpuInfo, GpuSample};
 use crate::platform::macos::{iokit::Service, sysctl};
 use std::io;
 
-/// Reads the real driver-published utilization counter. Frequency, power and
+/// Reads the real driver-published utilization counters. Frequency, power and
 /// temperature deliberately remain unavailable: macOS has no stable,
 /// unprivileged API for them across Apple Silicon generations.
 pub struct AppleGpuBackend {
@@ -32,8 +32,20 @@ impl GpuBackend for AppleGpuBackend {
             .service
             .dictionary_number("PerformanceStatistics", "Device Utilization %")?
             .clamp(0.0, 100.0);
+        let renderer_utilization_percent = self
+            .service
+            .dictionary_number("PerformanceStatistics", "Renderer Utilization %")
+            .ok()
+            .map(|value| value.clamp(0.0, 100.0));
+        let tiler_utilization_percent = self
+            .service
+            .dictionary_number("PerformanceStatistics", "Tiler Utilization %")
+            .ok()
+            .map(|value| value.clamp(0.0, 100.0));
         Ok(GpuSample {
             utilization_percent: Some(utilization),
+            renderer_utilization_percent,
+            tiler_utilization_percent,
             ..GpuSample::default()
         })
     }

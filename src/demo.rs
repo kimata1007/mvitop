@@ -80,9 +80,8 @@ impl DemoRuntime {
             }),
             gpu: Arc::new(GpuSample {
                 utilization_percent: Some(gpu),
-                frequency_hz: None,
-                power_watts: None,
-                temperature_celsius: None,
+                renderer_utilization_percent: Some(wave(phase, 58.0, 20.0, 0.9)),
+                tiler_utilization_percent: Some(wave(phase, 46.0, 18.0, 0.8)),
                 history: self.gpu_history.clone(),
             }),
             processes: Arc::new(processes),

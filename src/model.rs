@@ -42,9 +42,8 @@ pub struct GpuInfo {
 #[derive(Clone, Debug, Default)]
 pub struct GpuSample {
     pub utilization_percent: Option<f64>,
-    pub frequency_hz: Option<u64>,
-    pub power_watts: Option<f64>,
-    pub temperature_celsius: Option<f64>,
+    pub renderer_utilization_percent: Option<f64>,
+    pub tiler_utilization_percent: Option<f64>,
     pub history: History,
 }
 
@@ -134,9 +133,6 @@ impl History {
     }
     pub fn iter(&self) -> impl Iterator<Item = &f64> {
         self.values.iter()
-    }
-    pub fn len(&self) -> usize {
-        self.values.len()
     }
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()

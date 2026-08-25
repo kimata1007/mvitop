@@ -11,36 +11,6 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot) {
         .constraints([Constraint::Length(1); 3])
         .margin(1)
         .split(area);
-    let gpu = snapshot.gpu.utilization_percent;
-    let gpu_label = format!(
-        "GPU {:>5}  {:<18}  freq {}  power {}  temp {}",
-        gpu.map(|v| format!("{v:.0}%"))
-            .unwrap_or_else(|| "N/A".into()),
-        if snapshot.gpu_info.name.is_empty() {
-            "Apple GPU"
-        } else {
-            &snapshot.gpu_info.name
-        },
-        snapshot
-            .gpu
-            .frequency_hz
-            .map(|v| format!("{:.2}GHz", v as f64 / 1e9))
-            .unwrap_or_else(|| "N/A".into()),
-        snapshot
-            .gpu
-            .power_watts
-            .map(|v| format!("{v:.1}W"))
-            .unwrap_or_else(|| "N/A".into()),
-        snapshot
-            .gpu
-            .temperature_celsius
-            .map(|v| format!("{v:.0}°C"))
-            .unwrap_or_else(|| "N/A".into())
-    );
-    frame.render_widget(
-        gauge(gpu.unwrap_or(0.0), gpu_label, Color::Magenta),
-        rows[0],
-    );
     let clusters = match (
         snapshot.system.performance_cores,
         snapshot.system.efficiency_cores,
@@ -64,11 +34,31 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot) {
         gauge(
             snapshot.cpu.total_percent,
             format!(
-                "CPU {:>4.0}%  {} cores{clusters}{per_core}",
+                "CPU UTIL {:>4.0}%  {} cores{clusters}{per_core}",
                 snapshot.cpu.total_percent,
                 snapshot.cpu.per_core_percent.len()
             ),
             Color::Cyan,
+        ),
+        rows[0],
+    );
+    let gpu = snapshot.gpu.utilization_percent;
+    let renderer = optional_percent("render", snapshot.gpu.renderer_utilization_percent);
+    let tiler = optional_percent("tiler", snapshot.gpu.tiler_utilization_percent);
+    let gpu_name = if snapshot.gpu_info.name.is_empty() {
+        "Apple GPU"
+    } else {
+        &snapshot.gpu_info.name
+    };
+    frame.render_widget(
+        gauge(
+            gpu.unwrap_or(0.0),
+            format!(
+                "GPU UTIL {:>4}  {gpu_name}{renderer}{tiler}",
+                gpu.map(|value| format!("{value:.0}%"))
+                    .unwrap_or_else(|| "N/A".into())
+            ),
+            Color::Magenta,
         ),
         rows[1],
     );
@@ -80,7 +70,7 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot) {
         .unwrap_or_else(|| "N/A".into());
     let mem_label = if area.width >= 110 {
         format!(
-            "MEM {:>4.0}%  {} / {}  avail {}  wired {}  cached {}  compressed {}  swap {} / {}  pressure {pressure}",
+            "UNIFIED MEM {:>4.0}%  {} / {}  avail {}  wired {}  cached {}  compressed {}  swap {} / {}  pressure {pressure}",
             mem_percent,
             bytes(snapshot.memory.used),
             bytes(snapshot.memory.total),
@@ -93,7 +83,7 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot) {
         )
     } else {
         format!(
-            "MEM {:>4.0}%  {} / {}  compressed {}  swap {} / {}  pressure {pressure}",
+            "UNIFIED MEM {:>4.0}%  {} / {}  compressed {}  swap {} / {}  pressure {pressure}",
             mem_percent,
             bytes(snapshot.memory.used),
             bytes(snapshot.memory.total),
@@ -107,6 +97,12 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot) {
         Block::default().borders(Borders::LEFT | Borders::RIGHT),
         area,
     );
+}
+
+fn optional_percent(label: &str, value: Option<f64>) -> String {
+    value
+        .map(|value| format!("  {label} {value:.0}%"))
+        .unwrap_or_default()
 }
 
 fn gauge(percent: f64, label: String, color: Color) -> Gauge<'static> {
