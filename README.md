@@ -37,7 +37,7 @@ The MIT license in this repository applies to mvitop's independently authored co
 - An Apple Silicon Mac
 - macOS
 
-No administrator privileges, Rust toolchain, or Xcode installation is required when installing the prebuilt release with Homebrew.
+The prebuilt Homebrew release does not require a Rust toolchain or administrator privileges from mvitop itself. Homebrew's own macOS setup requirements still apply.
 
 ## Install
 
