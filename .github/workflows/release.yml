@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+permissions:
+  attestations: write
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Verify tag and package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          package_version="$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "mvitop") | .version')"
+          if [[ "$tag_version" != "$package_version" ]]; then
+            echo "tag version $tag_version does not match Cargo.toml version $package_version" >&2
+            exit 1
+          fi
+
+      - name: Verify source
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test --locked
+
+      - name: Build Apple Silicon binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "arm64"
+          cargo build --release --locked
+          test "$(lipo -archs target/release/mvitop)" = "arm64"
+
+      - name: Package release archive
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset="mvitop-${GITHUB_REF_NAME}-aarch64-apple-darwin.tar.gz"
+          mkdir -p dist/package
+          cp target/release/mvitop README.md LICENSE dist/package/
+          tar -C dist/package -czf "dist/$asset" mvitop README.md LICENSE
+          (cd dist && shasum -a 256 "$asset" > SHA256SUMS)
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+
+      - name: Attest release archive
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/${{ steps.package.outputs.asset }}
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mvitop-${{ github.ref_name }}-aarch64-apple-darwin
+          path: |
+            dist/${{ steps.package.outputs.asset }}
+            dist/SHA256SUMS
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/${{ steps.package.outputs.asset }}" \
+            dist/SHA256SUMS \
+            --generate-notes \
+            --title "mvitop ${GITHUB_REF_NAME}" \
+            --verify-tag
