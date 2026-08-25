@@ -1,3 +1,4 @@
+use crate::demo::DemoRuntime;
 use crate::event::{Event, EventLoop};
 use crate::metrics::process::visible;
 use crate::metrics::runtime::MetricsRuntime;
@@ -36,10 +37,24 @@ pub fn run() -> anyhow::Result<()> {
             "mvitop needs an interactive terminal (try --startup-benchmark for a non-TUI check)"
         );
     }
-    run_tui()
+    run_tui(args.iter().any(|arg| arg == "--demo"))
 }
 
-fn run_tui() -> anyhow::Result<()> {
+enum SnapshotSource {
+    Live(MetricsRuntime),
+    Demo(DemoRuntime),
+}
+
+impl SnapshotSource {
+    fn snapshot(&mut self) -> Arc<Snapshot> {
+        match self {
+            Self::Live(runtime) => runtime.snapshot(),
+            Self::Demo(runtime) => runtime.snapshot(),
+        }
+    }
+}
+
+fn run_tui(demo: bool) -> anyhow::Result<()> {
     let started = Instant::now();
     install_panic_restore();
     let _guard = TerminalGuard::enter()?;
@@ -53,14 +68,18 @@ fn run_tui() -> anyhow::Result<()> {
         .context("draw initial screen")?;
     let first_draw = started.elapsed();
 
-    let runtime = MetricsRuntime::start();
+    let mut source = if demo {
+        SnapshotSource::Demo(DemoRuntime::new())
+    } else {
+        SnapshotSource::Live(MetricsRuntime::start())
+    };
     let stopping = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(SIGINT, stopping.clone()).context("register SIGINT")?;
     signal_hook::flag::register(SIGTERM, stopping.clone()).context("register SIGTERM")?;
     let mut events = EventLoop::new(Duration::from_millis(crate::ui::refresh_millis(&view)));
 
     while !stopping.load(Ordering::Relaxed) {
-        let snapshot = runtime.snapshot();
+        let snapshot = source.snapshot();
         normalize_selection(&mut view, &snapshot);
         terminal
             .draw(|frame| crate::ui::render(frame, &snapshot, &view))
@@ -73,7 +92,7 @@ fn run_tui() -> anyhow::Result<()> {
         }
         events.set_interval(Duration::from_millis(crate::ui::refresh_millis(&view)));
     }
-    drop(runtime);
+    drop(source);
     let _ = first_draw;
     Ok(())
 }
@@ -355,7 +374,7 @@ fn startup_benchmark() -> anyhow::Result<()> {
 
 fn print_help() {
     println!(
-        "mvitop {}\n\nUsage: mvitop [--startup-benchmark]\n\nA native Apple Silicon system monitor. Run in an interactive terminal.",
+        "mvitop {}\n\nUsage: mvitop [--demo] [--startup-benchmark]\n\nA native Apple Silicon system monitor. --demo uses synthetic data only.",
         env!("CARGO_PKG_VERSION")
     );
 }

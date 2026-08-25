@@ -1,4 +1,5 @@
 mod app;
+mod demo;
 mod event;
 mod metrics;
 mod model;
