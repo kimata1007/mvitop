@@ -47,7 +47,7 @@ pub fn render(frame: &mut Frame<'_>, snapshot: &Snapshot, view: &ViewState) {
         format!(" {message}")
     } else {
         format!(
-            " q quit  ? help  / filter  sort[c/m/p]  tree[t]  detail[Enter]  signal[k]  refresh[r] {}ms",
+            " q quit  ? help  / filter  sort[g/p]  detail[Enter]  signal[k]  refresh[r] {}ms",
             refresh_millis(view)
         )
     };

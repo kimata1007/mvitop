@@ -9,14 +9,14 @@ use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
 
 pub fn render_detail(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot, view: &ViewState) {
     frame.render_widget(Clear, area);
-    let items = visible(&snapshot.processes, &view.filter, view.sort_key, view.tree);
+    let items = visible(&snapshot.processes, &view.filter, view.sort_key);
     let process = view
         .selected_pid
         .and_then(|pid| snapshot.processes.iter().find(|process| process.pid == pid))
         .or_else(|| items.get(view.selected).copied());
     let content = process.map(|process| format!(
-        "PID / PPID     {} / {}\nExecutable     {}\nCommand        {}\nUser           {}\nState          {}\nCPU            {:.1}%\nMemory         {} ({:.2}%)\nThreads        {}\nRuntime        {}\nStart time     {}\nWorking dir    {}\n\nChildren       {}",
-        process.pid, process.ppid, fallback(&process.executable), process.command, process.user, process.state.short(), process.cpu_percent, bytes(process.memory_bytes), process.memory_percent, process.threads, duration(process.runtime), process.start_time.map(crate::ui::system_time).unwrap_or_else(|| "N/A".into()), process.cwd.as_deref().unwrap_or("N/A (permission/API)"), snapshot.processes.iter().filter(|child| child.ppid == process.pid).count()
+        "PID / PPID     {} / {}\nGPU time       {:.1} ms/s\nExecutable     {}\nCommand        {}\nUser           {}\nState          {}\nCPU            {:.1}%\nMemory         {} ({:.2}%)\nThreads        {}\nRuntime        {}\nStart time     {}\nWorking dir    {}",
+        process.pid, process.ppid, process.gpu_time_ms_per_s, fallback(&process.executable), process.command, process.user, process.state.short(), process.cpu_percent, bytes(process.memory_bytes), process.memory_percent, process.threads, duration(process.runtime), process.start_time.map(crate::ui::system_time).unwrap_or_else(|| "N/A".into()), process.cwd.as_deref().unwrap_or("N/A (permission/API)")
     )).unwrap_or_else(|| "Process is no longer available.".to_owned());
     frame.render_widget(
         Paragraph::new(content).wrap(Wrap { trim: false }).block(

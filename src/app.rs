@@ -175,16 +175,6 @@ fn handle_key(
         KeyCode::Up => move_selection(view, snapshot, -1),
         KeyCode::PageDown => move_selection(view, snapshot, (height / 2).max(1) as isize),
         KeyCode::PageUp => move_selection(view, snapshot, -((height / 2).max(1) as isize)),
-        KeyCode::Char('c') => {
-            view.sort_key = SortKey::Cpu;
-            view.selected = 0;
-            view.selected_pid = None;
-        }
-        KeyCode::Char('m') => {
-            view.sort_key = SortKey::Memory;
-            view.selected = 0;
-            view.selected_pid = None;
-        }
         KeyCode::Char('p') => {
             view.sort_key = SortKey::Pid;
             view.selected = 0;
@@ -192,14 +182,10 @@ fn handle_key(
         }
         KeyCode::Char('g') => {
             view.sort_key = SortKey::Gpu;
-            view.message = Some("per-process GPU data unavailable; rows remain PID ordered".into());
-        }
-        KeyCode::Char('/') => view.editing_filter = true,
-        KeyCode::Char('t') => {
-            view.tree = !view.tree;
             view.selected = 0;
             view.selected_pid = None;
         }
+        KeyCode::Char('/') => view.editing_filter = true,
         KeyCode::Enter => {
             if selected_process(view, snapshot).is_some() {
                 view.screen = Screen::Detail;
@@ -256,13 +242,13 @@ fn selected_process<'a>(
             return Some(process);
         }
     }
-    visible(&snapshot.processes, &view.filter, view.sort_key, view.tree)
+    visible(&snapshot.processes, &view.filter, view.sort_key)
         .get(view.selected)
         .copied()
 }
 
 fn normalize_selection(view: &mut ViewState, snapshot: &Snapshot) {
-    let items = visible(&snapshot.processes, &view.filter, view.sort_key, view.tree);
+    let items = visible(&snapshot.processes, &view.filter, view.sort_key);
     if items.is_empty() {
         view.selected = 0;
         view.selected_pid = None;
@@ -279,7 +265,7 @@ fn normalize_selection(view: &mut ViewState, snapshot: &Snapshot) {
 }
 
 fn move_selection(view: &mut ViewState, snapshot: &Snapshot, delta: isize) {
-    let items = visible(&snapshot.processes, &view.filter, view.sort_key, view.tree);
+    let items = visible(&snapshot.processes, &view.filter, view.sort_key);
     if items.is_empty() {
         return;
     }
@@ -399,7 +385,7 @@ fn startup_benchmark() -> anyhow::Result<()> {
 
 fn print_help() {
     println!(
-        "mvitop {}\n\nUsage: mvitop [--demo] [--startup-benchmark]\n\nA native Apple Silicon system monitor. --demo uses synthetic data only.",
+        "mvitop {}\n\nUsage: mvitop [--demo] [--startup-benchmark]\n\nA native Apple Silicon system monitor. Live mode requests sudo authorization\nfor the fixed powermetrics GPU-process sampler. --demo uses synthetic data only.",
         env!("CARGO_PKG_VERSION")
     );
 }

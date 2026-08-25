@@ -156,7 +156,6 @@ pub fn visible<'a>(
     processes: &'a [ProcessInfo],
     filter: &str,
     key: SortKey,
-    tree: bool,
 ) -> Vec<&'a ProcessInfo> {
     let needle = filter.to_lowercase();
     let mut items: Vec<_> = processes
@@ -168,75 +167,14 @@ pub fn visible<'a>(
                 || p.pid.to_string().contains(&needle)
         })
         .collect();
-    if tree {
-        items = tree_order(items);
-    } else {
-        items.sort_unstable_by(|a, b| match key {
-            SortKey::Cpu => b
-                .cpu_percent
-                .total_cmp(&a.cpu_percent)
-                .then_with(|| a.pid.cmp(&b.pid)),
-            SortKey::Gpu => b
-                .gpu_time_ms_per_s
-                .total_cmp(&a.gpu_time_ms_per_s)
-                .then_with(|| a.pid.cmp(&b.pid)),
-            SortKey::Memory => b
-                .memory_bytes
-                .cmp(&a.memory_bytes)
-                .then_with(|| a.pid.cmp(&b.pid)),
-            SortKey::Pid => a.pid.cmp(&b.pid),
-        });
-    }
+    items.sort_unstable_by(|a, b| match key {
+        SortKey::Gpu => b
+            .gpu_time_ms_per_s
+            .total_cmp(&a.gpu_time_ms_per_s)
+            .then_with(|| a.pid.cmp(&b.pid)),
+        SortKey::Pid => a.pid.cmp(&b.pid),
+    });
     items
-}
-
-fn tree_order(items: Vec<&ProcessInfo>) -> Vec<&ProcessInfo> {
-    use std::collections::{HashMap, HashSet};
-    let pids: HashSet<i32> = items.iter().map(|process| process.pid).collect();
-    let mut children: HashMap<i32, Vec<&ProcessInfo>> = HashMap::new();
-    let mut roots = Vec::new();
-    for process in items {
-        if process.ppid != process.pid && pids.contains(&process.ppid) {
-            children.entry(process.ppid).or_default().push(process);
-        } else {
-            roots.push(process);
-        }
-    }
-    roots.sort_unstable_by_key(|process| process.pid);
-    for siblings in children.values_mut() {
-        siblings.sort_unstable_by_key(|process| process.pid);
-    }
-    let mut output = Vec::with_capacity(pids.len());
-    let mut stack: Vec<_> = roots.into_iter().rev().collect();
-    let mut visited = HashSet::new();
-    while let Some(process) = stack.pop() {
-        if !visited.insert(process.pid) {
-            continue;
-        }
-        output.push(process);
-        if let Some(children) = children.get(&process.pid) {
-            stack.extend(children.iter().rev().copied());
-        }
-    }
-    output
-}
-
-pub fn tree_depth(process: &ProcessInfo, processes: &[ProcessInfo]) -> usize {
-    let parents: HashMap<i32, i32> = processes
-        .iter()
-        .map(|process| (process.pid, process.ppid))
-        .collect();
-    let mut parent = process.ppid;
-    let mut seen = std::collections::HashSet::new();
-    let mut depth = 0;
-    while parent > 0 && depth < 16 && seen.insert(parent) {
-        let Some(next) = parents.get(&parent) else {
-            break;
-        };
-        depth += 1;
-        parent = *next;
-    }
-    depth
 }
 
 #[cfg(test)]
@@ -259,9 +197,7 @@ mod tests {
             proc(2, "beta", 10.0, 20, 200.0),
             proc(1, "alpha", 20.0, 10, 100.0),
         ];
-        assert_eq!(visible(&input, "", SortKey::Cpu, false)[0].pid, 1);
-        assert_eq!(visible(&input, "", SortKey::Memory, false)[0].pid, 2);
-        assert_eq!(visible(&input, "alp", SortKey::Pid, false).len(), 1);
-        assert_eq!(visible(&input, "", SortKey::Gpu, false)[0].pid, 2);
+        assert_eq!(visible(&input, "alp", SortKey::Pid).len(), 1);
+        assert_eq!(visible(&input, "", SortKey::Gpu)[0].pid, 2);
     }
 }

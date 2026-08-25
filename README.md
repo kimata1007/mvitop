@@ -1,6 +1,6 @@
 # mvitop
 
-`mvitop` is a fast, keyboard-driven terminal system monitor for Apple Silicon Macs. It reads CPU and unified-memory counters through Mach, processes through libproc, system data through sysctl, and real GPU utilization from the Apple GPU driver's IORegistry entry. It never launches `powermetrics` or another command in its sampling loop.
+`mvitop` is a fast, keyboard-driven terminal system monitor for Apple Silicon Macs. It reads CPU and unified-memory counters through Mach, system data through sysctl, real GPU utilization from the Apple GPU driver's IORegistry entry, and active GPU process time from a single privileged `powermetrics` stream.
 
 ![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange)
 ![Platform](https://img.shields.io/badge/platform-Apple%20Silicon%20macOS-lightgrey)
@@ -21,23 +21,24 @@ The MIT license in this repository applies to mvitop's independently authored co
 
 ## Features
 
-- Starts with an immediate empty frame; collectors never block the first draw
+- Clear CPU utilization, GPU utilization, and unified-memory gauges
 - Total and per-core CPU utilization, including P/E core counts when macOS publishes them
 - Apple-style unified memory details: used, available, wired, cached, compressed, and swap
-- Real Apple GPU device utilization when the driver publishes `PerformanceStatistics`
-- PID, PPID, user, CPU, physical footprint, threads, state, runtime, command line, executable, and cwd
-- Fixed-size CPU, GPU, and memory histories
-- Process sort, filter, tree view, marking, details, and safe signal confirmation
+- Real Apple GPU device, renderer, and tiler utilization when the driver publishes `PerformanceStatistics`
+- A focused process table containing only processes active on the GPU in the latest one-second sample
+- Per-process GPU time, with PID, command, filter, details, marking, and safe signal confirmation
+- Fixed-size CPU utilization, GPU utilization, and unified-memory histories
 - Responsive layouts for small terminals
-- Graceful degradation per metric; no `sudo` required
+- The TUI stays unprivileged; only the fixed `powermetrics` child command runs through `sudo`
 - Terminal restoration on normal exit, error, panic, SIGINT, and SIGTERM
 
 ## Requirements
 
 - An Apple Silicon Mac
 - macOS
+- Administrator authorization for the GPU process table
 
-The prebuilt Homebrew release does not require a Rust toolchain or administrator privileges from mvitop itself. Homebrew's own macOS setup requirements still apply.
+The prebuilt Homebrew release does not require a Rust toolchain. At launch, mvitop requests administrator authorization before entering the TUI because macOS restricts per-process GPU time. The mvitop UI, filtering, detail view, and signal actions continue to run as the invoking user.
 
 ## Install
 
@@ -78,6 +79,15 @@ Run it in an interactive terminal:
 mvitop
 ```
 
+Before the TUI opens, macOS may ask for your password through `sudo`. mvitop uses the resulting authorization only to run this fixed command:
+
+```sh
+/usr/bin/powermetrics --sample-rate 1000 --sample-count -1 \
+  --buffer-size 1 --format plist --samplers tasks --show-process-gpu
+```
+
+If authorization is declined, CPU, GPU, unified-memory, and history metrics remain available; the GPU process table reports that authorization is required.
+
 ## Keyboard controls
 
 | Key | Action |
@@ -86,10 +96,8 @@ mvitop
 | `?` / `h` | Help |
 | `↑`, `↓`, `j` | Select a process |
 | `PgUp` / `PgDn` | Move by a page |
-| `c` / `m` / `p` | Sort by CPU, memory, or PID |
-| `g` | Request GPU sort; explains when per-process GPU data is unavailable |
+| `g` / `p` | Sort by GPU time or PID |
 | `/` | Edit process filter |
-| `t` | Toggle process tree |
 | `Enter` | Process detail |
 | `Space` | Mark/unmark a process |
 | `k` | Open the signal confirmation menu |
@@ -102,16 +110,17 @@ The signal dialog supports SIGTERM, SIGINT, and SIGKILL. Before calling `kill(2)
 
 `mvitop` shows missing data as `N/A`; it does not invent or extrapolate unavailable values.
 
-- **GPU utilization:** read from the numeric `Device Utilization %` value in the Apple GPU driver's IORegistry `PerformanceStatistics` dictionary. This driver-published property exists on the tested Apple Silicon generations but is not a stable cross-version API contract. If Apple removes or renames it, only GPU sampling degrades.
-- **GPU frequency, power, and temperature:** shown as `N/A` unless a future backend can obtain a reliable real value without root. mvitop does not derive these from utilization or repeatedly spawn `powermetrics`.
-- **Per-process GPU and GPU memory:** shown as `--`. macOS does not expose a stable, accurate unprivileged API across OS and SoC generations, so processes are never assigned estimated GPU values.
+- **GPU utilization:** read from the numeric device, renderer, and tiler utilization values in the Apple GPU driver's IORegistry `PerformanceStatistics` dictionary. These driver-published properties exist on the tested Apple Silicon generations but are not a stable cross-version API contract. Missing renderer or tiler values are simply omitted.
+- **Per-process GPU activity:** read from `gputime_ms_per_s` in the plist output of macOS `powermetrics --show-process-gpu`. Rows with zero GPU time are omitted. This option is available only on supported hardware and requires administrator authorization.
+- **GPU time vs. GPU utilization:** process GPU time is time scheduled in the one-second measurement window. It is not presented as device utilization, and individual rows are not expected to add up to the global GPU utilization value.
+- **GPU memory:** not shown separately because Apple Silicon uses unified memory and macOS does not publish a reliable per-process GPU allocation through this interface.
 - **Memory pressure:** shown as `N/A` because macOS does not expose a stable unprivileged numeric pressure percentage. Used memory follows macOS VM categories instead of pretending to be Linux `MemAvailable`.
 - **CPU frequency:** not displayed because the available values are not consistently live or comparable across P/E clusters.
 - **Protected processes:** macOS privacy and system protections can hide argv, executable paths, or working directories. The row remains visible with the fields that were obtainable.
 
 ## Architecture and sampling
 
-The UI performs no metric I/O. Five named workers publish immutable, latest-only snapshots with `ArcSwap`; unchanged process vectors are shared with `Arc` instead of copied on every CPU update. An RCU update prevents simultaneous collectors from overwriting one another.
+The UI performs no metric I/O. Five named workers publish immutable, latest-only snapshots with `ArcSwap`; unchanged process vectors are shared with `Arc` instead of copied on every CPU update. An RCU update prevents simultaneous collectors from overwriting one another. The process worker keeps one `powermetrics` child alive and parses its NUL-separated plist samples instead of spawning a command every second.
 
 | Collector | Default period |
 |---|---:|

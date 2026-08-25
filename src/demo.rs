@@ -104,6 +104,7 @@ fn synthetic_processes(phase: f64, total_memory: u64) -> Vec<ProcessInfo> {
             13 * GIB,
             164,
             ProcessState::Running,
+            487.0,
         ),
         (
             3172,
@@ -113,15 +114,7 @@ fn synthetic_processes(phase: f64, total_memory: u64) -> Vec<ProcessInfo> {
             7 * GIB,
             58,
             ProcessState::Sleeping,
-        ),
-        (
-            5201,
-            4100,
-            "cargo",
-            "cargo test --release",
-            2 * GIB,
-            32,
-            ProcessState::Running,
+            102.0,
         ),
         (
             6110,
@@ -131,15 +124,7 @@ fn synthetic_processes(phase: f64, total_memory: u64) -> Vec<ProcessInfo> {
             GIB,
             24,
             ProcessState::Running,
-        ),
-        (
-            7301,
-            4210,
-            "data-prep",
-            "data-prep --input sample-data",
-            3 * GIB,
-            18,
-            ProcessState::Sleeping,
+            39.0,
         ),
         (
             8124,
@@ -149,21 +134,13 @@ fn synthetic_processes(phase: f64, total_memory: u64) -> Vec<ProcessInfo> {
             5 * GIB,
             42,
             ProcessState::Sleeping,
-        ),
-        (
-            9100,
-            1,
-            "terminal",
-            "terminal --profile demo",
-            220 * 1024 * 1024,
-            12,
-            ProcessState::Sleeping,
+            12.0,
         ),
     ];
     rows.into_iter()
         .enumerate()
         .map(
-            |(index, (pid, ppid, name, command, memory, threads, state))| {
+            |(index, (pid, ppid, name, command, memory, threads, state, gpu_time))| {
                 let cpu = wave(
                     phase + index as f64 * 0.63,
                     18.0 + index as f64 * 2.0,
@@ -177,12 +154,9 @@ fn synthetic_processes(phase: f64, total_memory: u64) -> Vec<ProcessInfo> {
                     name: name.into(),
                     executable: format!("/opt/demo/bin/{name}"),
                     command: command.into(),
-                    gpu_time_ms_per_s: wave(
-                        phase + index as f64 * 0.41,
-                        210.0 / 10.0 + index as f64 * 3.0,
-                        12.0,
-                        0.9,
-                    ) * 10.0,
+                    gpu_time_ms_per_s: (gpu_time
+                        + 18.0 * (phase * 0.9 + index as f64 * 0.41).sin())
+                    .clamp(0.1, 1_000.0),
                     cpu_percent: cpu,
                     memory_bytes: memory,
                     memory_percent: memory as f64 * 100.0 / total_memory as f64,

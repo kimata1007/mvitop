@@ -173,6 +173,7 @@ fn spawn_processes(
     named_thread("process", move || {
         if !gpu_process_access {
             update(&shared, |snapshot| {
+                snapshot.processes = Arc::new(Vec::new());
                 snapshot.status.process_error =
                     Some("GPU process monitoring needs administrator authorization".into())
             });
@@ -193,6 +194,7 @@ fn spawn_processes(
                         }
                         Err(error) => {
                             update(&shared, |snapshot| {
+                                snapshot.processes = Arc::new(Vec::new());
                                 snapshot.status.process_error = Some(error.to_string())
                             });
                             break;
@@ -203,6 +205,7 @@ fn spawn_processes(
                     }
                 },
                 Err(error) => update(&shared, |snapshot| {
+                    snapshot.processes = Arc::new(Vec::new());
                     snapshot.status.process_error = Some(format!(
                         "cannot start privileged GPU process sampler: {error}"
                     ))

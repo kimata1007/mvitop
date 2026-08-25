@@ -149,8 +149,6 @@ impl Default for History {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum SortKey {
     #[default]
-    Cpu,
-    Memory,
     Gpu,
     Pid,
 }
@@ -172,7 +170,6 @@ pub struct ViewState {
     pub sort_key: SortKey,
     pub filter: String,
     pub editing_filter: bool,
-    pub tree: bool,
     pub marked: HashSet<i32>,
     pub signal_index: usize,
     pub signal_targets: Vec<(i32, Option<SystemTime>)>,
@@ -186,10 +183,9 @@ impl Default for ViewState {
             screen: Screen::Main,
             selected: 0,
             selected_pid: None,
-            sort_key: SortKey::Cpu,
+            sort_key: SortKey::Gpu,
             filter: String::new(),
             editing_filter: false,
-            tree: false,
             marked: HashSet::new(),
             signal_index: 0,
             signal_targets: Vec::new(),

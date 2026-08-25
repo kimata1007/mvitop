@@ -4,7 +4,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
 pub fn render(frame: &mut Frame<'_>, area: Rect) {
-    let text = "Navigation\n  ↑/↓, j       select process       PgUp/PgDn  page\n  Enter        process detail       Esc        close overlay\n\nProcess view\n  c / m / p    sort CPU/memory/PID  /          filter\n  t            toggle process tree  Space      mark process\n  k            signal/kill menu     r          UI refresh rate\n\nApplication\n  ? / h        this help             q          quit\n\nGPU values are shown only when the driver publishes a real value.\nPer-process GPU usage is not estimated.";
+    let text = "Navigation\n  ↑/↓, j       select process       PgUp/PgDn  page\n  Enter        process detail       Esc        close overlay\n\nGPU process view\n  g / p        sort GPU time/PID    /          filter\n  Space        mark process         k          signal/kill menu\n  r            UI refresh rate\n\nApplication\n  ? / h        this help             q          quit\n\nOnly processes with GPU time in the latest 1s sample are listed.\nGPU process time comes from privileged macOS powermetrics data.";
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(text)
