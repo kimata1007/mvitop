@@ -1,0 +1,1 @@
+//! GPU collector abstraction.
