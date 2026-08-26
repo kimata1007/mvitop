@@ -9,7 +9,7 @@
 <p align="center">
   <img src="docs/mvitop-demo.gif" alt="mvitop terminal interface demo" width="100%">
 </p>
-<p align="center"><sub>Recorded from <code>mvitop --demo</code> with synthetic metrics and processes. No host or personal data is included.</sub></p>
+<p align="center"><sub>Recorded from <code>mvitop --demo</code> with synthetic metrics and jobs. No host or personal data is included.</sub></p>
 
 ## Inspiration and independent implementation
 
@@ -25,9 +25,11 @@ The MIT license in this repository applies to mvitop's independently authored co
 - Total and per-core CPU utilization, including P/E core counts when macOS publishes them
 - Apple-style unified memory details: used, available, wired, cached, compressed, and swap
 - Real Apple GPU device, renderer, and tiler utilization when the driver publishes `PerformanceStatistics`
-- A focused process table containing only processes active on the GPU in the latest one-second sample
-- Per-process GPU time, with PID, command, filter, details, marking, and safe signal confirmation
+- A focused job table containing only active foreground commands launched from an interactive terminal
+- CPU, GPU time, and unified memory aggregated across each job's child processes
+- PID, command, filter, details, marking, and safe signal confirmation for job roots
 - Fixed-size CPU utilization, GPU utilization, and unified-memory histories
+- A compact job pane that leaves more room for gauges and history graphs
 - Responsive layouts for small terminals
 - The TUI stays unprivileged; only the fixed `powermetrics` child command runs through `sudo`
 - Terminal restoration on normal exit, error, panic, SIGINT, and SIGTERM
@@ -36,7 +38,7 @@ The MIT license in this repository applies to mvitop's independently authored co
 
 - An Apple Silicon Mac
 - macOS
-- Administrator authorization for the GPU process table
+- Administrator authorization for per-job GPU time
 
 The prebuilt Homebrew release does not require a Rust toolchain. At launch, mvitop requests administrator authorization before entering the TUI because macOS restricts per-process GPU time. The mvitop UI, filtering, detail view, and signal actions continue to run as the invoking user.
 
@@ -86,7 +88,7 @@ Before the TUI opens, macOS may ask for your password through `sudo`. mvitop use
   --buffer-size 1 --format plist --samplers tasks --show-process-gpu
 ```
 
-If authorization is declined, CPU, GPU, unified-memory, and history metrics remain available; the GPU process table reports that authorization is required.
+If authorization is declined, CPU, GPU, unified-memory, histories, and the active user-job table remain available. Only the per-job GPU-time column reports `N/A`.
 
 ## Keyboard controls
 
@@ -94,40 +96,42 @@ If authorization is declined, CPU, GPU, unified-memory, and history metrics rema
 |---|---|
 | `q` | Quit |
 | `?` / `h` | Help |
-| `↑`, `↓`, `j` | Select a process |
+| `↑`, `↓`, `j` | Select a job |
 | `PgUp` / `PgDn` | Move by a page |
-| `g` / `p` | Sort by GPU time or PID |
-| `/` | Edit process filter |
-| `Enter` | Process detail |
-| `Space` | Mark/unmark a process |
+| `g` / `p` | Sort by GPU/CPU activity or PID |
+| `/` | Edit job filter |
+| `Enter` | Job detail |
+| `Space` | Mark/unmark a job |
 | `k` | Open the signal confirmation menu |
 | `r` | Cycle UI refresh through 100/200/500/1000 ms |
 | `Esc` | Close a dialog or finish filter editing |
 
-The signal dialog supports SIGTERM, SIGINT, and SIGKILL. Before calling `kill(2)`, mvitop reads the target again and compares its start time to guard against PID reuse. PID 1 and mvitop itself are excluded.
+The signal dialog supports SIGTERM, SIGINT, and SIGKILL for the selected job's root process. Before calling `kill(2)`, mvitop reads the target again and compares its start time to guard against PID reuse. PID 1 and mvitop itself are excluded.
 
 ## Metric accuracy and macOS limitations
 
 `mvitop` shows missing data as `N/A`; it does not invent or extrapolate unavailable values.
 
 - **GPU utilization:** read from the numeric device, renderer, and tiler utilization values in the Apple GPU driver's IORegistry `PerformanceStatistics` dictionary. These driver-published properties exist on the tested Apple Silicon generations but are not a stable cross-version API contract. Missing renderer or tiler values are simply omitted.
-- **Per-process GPU activity:** read from `gputime_ms_per_s` in the plist output of macOS `powermetrics --show-process-gpu`. Rows with zero GPU time are omitted. This option is available only on supported hardware and requires administrator authorization.
-- **GPU time vs. GPU utilization:** process GPU time is time scheduled in the one-second measurement window. It is not presented as device utilization, and individual rows are not expected to add up to the global GPU utilization value.
+- **Active user jobs:** a job is the foreground process group below an interactive shell. GUI applications, idle shells, background LaunchAgents, other users, root jobs, and mvitop itself are omitted. Commands launched through a terminal, including an IDE's integrated terminal, are supported; IDE Run actions without a terminal and detached jobs are intentionally outside this initial scope.
+- **Activity threshold:** a job appears when its descendants use at least 0.1% CPU in the latest one-second interval or report non-zero GPU time. It remains visible for three seconds after activity stops to avoid flicker.
+- **Per-job GPU activity:** `gputime_ms_per_s` values from macOS `powermetrics --show-process-gpu` are summed across the job's descendant processes. This option is available only on supported hardware and requires administrator authorization.
+- **GPU time vs. GPU utilization:** job GPU time is scheduled time in the one-second measurement window. It is not presented as device utilization, and rows are not expected to add up to the global GPU utilization value.
 - **GPU memory:** not shown separately because Apple Silicon uses unified memory and macOS does not publish a reliable per-process GPU allocation through this interface.
 - **Memory pressure:** shown as `N/A` because macOS does not expose a stable unprivileged numeric pressure percentage. Used memory follows macOS VM categories instead of pretending to be Linux `MemAvailable`.
 - **CPU frequency:** not displayed because the available values are not consistently live or comparable across P/E clusters.
-- **Protected processes:** macOS privacy and system protections can hide argv, executable paths, or working directories. The row remains visible with the fields that were obtainable.
+- **Process races:** jobs can start or exit while libproc is being sampled. Missing members are skipped, and PID plus start time identifies a job root across samples.
 
 ## Architecture and sampling
 
-The UI performs no metric I/O. Five named workers publish immutable, latest-only snapshots with `ArcSwap`; unchanged process vectors are shared with `Arc` instead of copied on every CPU update. An RCU update prevents simultaneous collectors from overwriting one another. The process worker keeps one `powermetrics` child alive and parses its NUL-separated plist samples instead of spawning a command every second.
+The UI performs no metric I/O. Five named workers publish immutable, latest-only snapshots with `ArcSwap`; unchanged job vectors are shared with `Arc` instead of copied on every CPU update. An RCU update prevents simultaneous collectors from overwriting one another. The process worker builds the current user's TTY process tree through libproc, aggregates descendants into foreground jobs, and keeps one `powermetrics` child alive instead of spawning a command every second.
 
 | Collector | Default period |
 |---|---:|
 | GPU | 350 ms |
 | CPU | 500 ms |
 | Memory | 500 ms |
-| Processes | 1 s |
+| Active user jobs | 1 s |
 | Static/slow system data | 15 s |
 
 All histories are bounded ring buffers. Shutdown uses a condition variable so even the 15-second worker exits immediately.
