@@ -73,6 +73,7 @@ impl ProcessState {
 pub struct ProcessInfo {
     pub pid: i32,
     pub ppid: i32,
+    pub member_count: u32,
     pub user: String,
     pub name: String,
     pub executable: String,
@@ -94,6 +95,7 @@ pub struct MetricStatus {
     pub cpu_error: Option<String>,
     pub memory_error: Option<String>,
     pub process_error: Option<String>,
+    pub gpu_process_error: Option<String>,
     pub gpu_error: Option<String>,
 }
 

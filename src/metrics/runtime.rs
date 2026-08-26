@@ -13,6 +13,7 @@ use std::time::{Duration, SystemTime};
 const CPU_INTERVAL: Duration = Duration::from_millis(500);
 const MEMORY_INTERVAL: Duration = Duration::from_millis(500);
 const GPU_INTERVAL: Duration = Duration::from_millis(350);
+const PROCESS_INTERVAL: Duration = Duration::from_secs(1);
 const SLOW_INTERVAL: Duration = Duration::from_secs(15);
 
 type SharedSnapshot = Arc<ArcSwap<Snapshot>>;
@@ -171,32 +172,28 @@ fn spawn_processes(
     gpu_process_access: bool,
 ) -> JoinHandle<()> {
     named_thread("process", move || {
+        let mut collector = ProcessCollector::default();
         if !gpu_process_access {
-            update(&shared, |snapshot| {
-                snapshot.processes = Arc::new(Vec::new());
-                snapshot.status.process_error =
-                    Some("GPU process monitoring needs administrator authorization".into())
+            run_periodically(&shutdown, PROCESS_INTERVAL, || {
+                publish_processes(
+                    &shared,
+                    &mut collector,
+                    &[],
+                    Some("administrator authorization is required for per-job GPU time"),
+                );
             });
             return;
         }
-        let mut collector = ProcessCollector::default();
         while !is_stopped(&shutdown) {
             match PowermetricsSampler::start() {
                 Ok(mut sampler) => loop {
                     match sampler.next_sample() {
                         Ok(activities) => {
-                            let total_memory = shared.load().memory.total;
-                            let processes = Arc::new(collector.sample(total_memory, &activities));
-                            update(&shared, |snapshot| {
-                                snapshot.processes = processes.clone();
-                                snapshot.status.process_error = None;
-                            });
+                            publish_processes(&shared, &mut collector, &activities, None)
                         }
                         Err(error) => {
-                            update(&shared, |snapshot| {
-                                snapshot.processes = Arc::new(Vec::new());
-                                snapshot.status.process_error = Some(error.to_string())
-                            });
+                            let message = error.to_string();
+                            publish_processes(&shared, &mut collector, &[], Some(&message));
                             break;
                         }
                     }
@@ -204,18 +201,39 @@ fn spawn_processes(
                         break;
                     }
                 },
-                Err(error) => update(&shared, |snapshot| {
-                    snapshot.processes = Arc::new(Vec::new());
-                    snapshot.status.process_error = Some(format!(
-                        "cannot start privileged GPU process sampler: {error}"
-                    ))
-                }),
+                Err(error) => {
+                    let message = format!("cannot start privileged GPU process sampler: {error}");
+                    publish_processes(&shared, &mut collector, &[], Some(&message));
+                }
             }
             if wait_for_shutdown(&shutdown, Duration::from_secs(1)) {
                 break;
             }
         }
     })
+}
+
+fn publish_processes(
+    shared: &SharedSnapshot,
+    collector: &mut ProcessCollector,
+    activities: &[crate::metrics::gpu_process::GpuProcessActivity],
+    gpu_error: Option<&str>,
+) {
+    let total_memory = shared.load().memory.total;
+    match collector.sample(total_memory, activities) {
+        Ok(processes) => {
+            let processes = Arc::new(processes);
+            update(shared, |snapshot| {
+                snapshot.processes = processes.clone();
+                snapshot.status.process_error = None;
+                snapshot.status.gpu_process_error = gpu_error.map(str::to_owned);
+            });
+        }
+        Err(error) => update(shared, |snapshot| {
+            snapshot.status.process_error = Some(error.to_string());
+            snapshot.status.gpu_process_error = gpu_error.map(str::to_owned);
+        }),
+    }
 }
 
 fn spawn_gpu(shared: SharedSnapshot, shutdown: Shutdown) -> JoinHandle<()> {
