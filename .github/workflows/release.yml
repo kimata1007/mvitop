@@ -1,9 +1,12 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and publish
+        required: true
+        type: string
 
 permissions:
   attestations: write
@@ -11,14 +14,19 @@ permissions:
   id-token: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag }}
   cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag }}
 
 jobs:
   release:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -28,7 +36,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag_version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "unsupported release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          tag_version="${RELEASE_TAG#v}"
           package_version="$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "mvitop") | .version')"
           if [[ "$tag_version" != "$package_version" ]]; then
             echo "tag version $tag_version does not match Cargo.toml version $package_version" >&2
@@ -54,7 +66,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          asset="mvitop-${GITHUB_REF_NAME}-aarch64-apple-darwin.tar.gz"
+          asset="mvitop-${RELEASE_TAG}-aarch64-apple-darwin.tar.gz"
           mkdir -p dist/package
           cp target/release/mvitop README.md LICENSE dist/package/
           tar -C dist/package -czf "dist/$asset" mvitop README.md LICENSE
@@ -69,20 +81,34 @@ jobs:
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7
         with:
-          name: mvitop-${{ github.ref_name }}-aarch64-apple-darwin
+          name: mvitop-${{ env.RELEASE_TAG }}-aarch64-apple-darwin
           path: |
             dist/${{ steps.package.outputs.asset }}
             dist/SHA256SUMS
 
-      - name: Publish GitHub Release
+      - name: Upload assets to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME" \
+          gh release view "$RELEASE_TAG" >/dev/null
+          gh release upload "$RELEASE_TAG" \
             "dist/${{ steps.package.outputs.asset }}" \
             dist/SHA256SUMS \
-            --generate-notes \
-            --title "mvitop ${GITHUB_REF_NAME}" \
-            --verify-tag
+            --clobber
+
+      - name: Request immediate Homebrew update
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::notice::HOMEBREW_TAP_TOKEN is not configured; the tap's scheduled updater will pick up this release"
+            exit 0
+          fi
+          gh api \
+            --method POST \
+            repos/kimata1007/homebrew-tap/dispatches \
+            -f event_type=mvitop-released
