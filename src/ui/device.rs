@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, Borders, Gauge};
 pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1); 3])
+        .constraints([Constraint::Fill(1); 3])
         .margin(1)
         .split(area);
     let clusters = match (

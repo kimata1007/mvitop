@@ -11,27 +11,7 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub fn render(frame: &mut Frame<'_>, snapshot: &Snapshot, view: &ViewState) {
     let area = frame.area();
-    let show_graphs = area.height >= 28 && area.width >= 60;
-    let rows = if show_graphs {
-        vec![
-            Constraint::Length(3),
-            Constraint::Length(5),
-            Constraint::Length(7),
-            Constraint::Min(5),
-            Constraint::Length(1),
-        ]
-    } else {
-        vec![
-            Constraint::Length(3),
-            Constraint::Length(5),
-            Constraint::Min(5),
-            Constraint::Length(1),
-        ]
-    };
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(rows)
-        .split(area);
+    let (show_graphs, chunks) = main_layout(area);
     header::render(frame, chunks[0], snapshot);
     device::render(frame, chunks[1], snapshot);
     let (process_area, footer_index) = if show_graphs {
@@ -65,6 +45,31 @@ pub fn render(frame: &mut Frame<'_>, snapshot: &Snapshot, view: &ViewState) {
         Screen::Signal => process_detail::render_signal(frame, centered(area, 62, 14), view),
         Screen::Main => {}
     }
+}
+
+fn main_layout(area: Rect) -> (bool, Vec<Rect>) {
+    let show_graphs = area.height >= 28 && area.width >= 60;
+    let rows = if show_graphs {
+        vec![
+            Constraint::Length(3),
+            Constraint::Length(7),
+            Constraint::Min(8),
+            Constraint::Length(9),
+            Constraint::Length(1),
+        ]
+    } else {
+        vec![
+            Constraint::Length(3),
+            Constraint::Min(7),
+            Constraint::Length(8),
+            Constraint::Length(1),
+        ]
+    };
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(rows)
+        .split(area);
+    (show_graphs, chunks.to_vec())
 }
 
 pub fn refresh_millis(view: &ViewState) -> u64 {
@@ -166,5 +171,19 @@ mod tests {
                     .unwrap();
             }
         }
+    }
+
+    #[test]
+    fn prioritizes_metrics_over_the_job_table() {
+        let (show_graphs, large) = main_layout(Rect::new(0, 0, 120, 40));
+        assert!(show_graphs);
+        assert_eq!(large[1].height, 7);
+        assert!(large[2].height >= 8);
+        assert_eq!(large[3].height, 9);
+
+        let (show_graphs, compact) = main_layout(Rect::new(0, 0, 80, 24));
+        assert!(!show_graphs);
+        assert!(compact[1].height >= 7);
+        assert_eq!(compact[2].height, 8);
     }
 }
