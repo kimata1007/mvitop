@@ -53,10 +53,7 @@ pub fn render_signal(frame: &mut Frame<'_>, area: Rect, view: &ViewState) {
                 Span::raw(format!("  {description}")),
             ]))
         });
-    let title = format!(
-        " Confirm signal to {} process(es) ",
-        view.signal_targets.len()
-    );
+    let title = format!(" Confirm signal to {} job(s) ", view.signal_targets.len());
     let footer = Paragraph::new("↑/↓ select · Enter sends · Esc cancels")
         .style(Style::default().fg(Color::Yellow));
     let inner = Rect {

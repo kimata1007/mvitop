@@ -68,7 +68,15 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot, view: &Vie
     } else {
         format!("  filter:{}", view.filter)
     };
-    let title = format!(" ACTIVE USER JOBS {}  sort:{sort}{filter} ", items.len());
+    let gpu_status = if snapshot.status.gpu_process_error.is_some() {
+        "  GPU time:N/A"
+    } else {
+        ""
+    };
+    let title = format!(
+        " ACTIVE USER JOBS {}  sort:{sort}{filter}{gpu_status} ",
+        items.len()
+    );
     let table = Table::new(rows, widths)
         .header(
             Row::new([" ", "PID", "GPU TIME", "CPU", "UMEM", "COMMAND"]).style(
