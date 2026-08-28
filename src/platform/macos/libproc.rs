@@ -8,6 +8,7 @@ use std::mem::{MaybeUninit, size_of};
 const PROC_PIDTBSDINFO: i32 = 3;
 const PROC_PIDTASKINFO: i32 = 4;
 const PROC_PIDVNODEPATHINFO: i32 = 9;
+const PROC_ALL_PIDS: u32 = 1;
 const RUSAGE_INFO_V4: i32 = 4;
 const PROC_PIDPATHINFO_MAXSIZE: usize = 4_096;
 
@@ -117,6 +118,12 @@ struct VnodePathInfo {
 }
 
 unsafe extern "C" {
+    fn proc_listpids(
+        process_type: u32,
+        type_info: u32,
+        buffer: *mut libc::c_void,
+        buffer_size: i32,
+    ) -> i32;
     fn proc_pidinfo(
         pid: i32,
         flavor: i32,
@@ -126,6 +133,31 @@ unsafe extern "C" {
     ) -> i32;
     fn proc_pidpath(pid: i32, buffer: *mut libc::c_void, buffer_size: u32) -> i32;
     fn proc_pid_rusage(pid: i32, flavor: i32, buffer: *mut RusageInfoV4) -> i32;
+}
+
+pub fn list_pids() -> io::Result<Vec<i32>> {
+    // SAFETY: a null buffer asks libproc for the required byte count.
+    let required = unsafe { proc_listpids(PROC_ALL_PIDS, 0, std::ptr::null_mut(), 0) };
+    if required <= 0 {
+        return Err(io::Error::last_os_error());
+    }
+
+    // Leave spare entries for processes created between the sizing and data calls.
+    let mut pids = vec![0i32; required as usize / size_of::<i32>() + 32];
+    let buffer_size = i32::try_from(pids.len() * size_of::<i32>()).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "process list buffer is too large",
+        )
+    })?;
+    // SAFETY: pids owns buffer_size writable bytes for the duration of the call.
+    let read = unsafe { proc_listpids(PROC_ALL_PIDS, 0, pids.as_mut_ptr().cast(), buffer_size) };
+    if read <= 0 {
+        return Err(io::Error::last_os_error());
+    }
+    pids.truncate(read as usize / size_of::<i32>());
+    pids.retain(|pid| *pid > 0);
+    Ok(pids)
 }
 
 fn pid_info<T: Copy>(pid: i32, flavor: i32) -> io::Result<T> {
@@ -211,6 +243,7 @@ mod tests {
     #[test]
     fn reads_current_process() {
         let pid = std::process::id() as i32;
+        assert!(list_pids().unwrap().contains(&pid));
         assert_eq!(bsd_info(pid).unwrap().pid, pid as u32);
         assert!(task_info(pid).unwrap().thread_count > 0);
         assert!(!executable(pid).unwrap().is_empty());

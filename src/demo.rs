@@ -150,6 +150,7 @@ fn synthetic_processes(phase: f64, total_memory: u64) -> Vec<ProcessInfo> {
                 ProcessInfo {
                     pid,
                     ppid,
+                    member_count: (index as u32 + 1) * 2,
                     user: "demo".into(),
                     name: name.into(),
                     executable: format!("/opt/demo/bin/{name}"),

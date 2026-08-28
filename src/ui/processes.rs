@@ -1,5 +1,6 @@
 use crate::metrics::process::visible;
 use crate::model::{Snapshot, SortKey, ViewState};
+use crate::ui::bytes;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -10,7 +11,9 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot, view: &Vie
     let widths = [
         Constraint::Length(1),
         Constraint::Length(7),
-        Constraint::Length(14),
+        Constraint::Length(12),
+        Constraint::Length(8),
+        Constraint::Length(10),
         Constraint::Min(12),
     ];
     let rows: Vec<_> = if items.is_empty() {
@@ -18,14 +21,16 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot, view: &Vie
             .status
             .process_error
             .as_deref()
-            .unwrap_or("No GPU activity in the latest 1s sample");
-        vec![Row::new(["", "", "", message]).style(Style::default().fg(
-            if snapshot.status.process_error.is_some() {
-                Color::Yellow
-            } else {
-                Color::DarkGray
-            },
-        ))]
+            .unwrap_or("No active foreground user jobs");
+        vec![
+            Row::new(["", "", "", "", "", message]).style(Style::default().fg(
+                if snapshot.status.process_error.is_some() {
+                    Color::Yellow
+                } else {
+                    Color::DarkGray
+                },
+            )),
+        ]
     } else {
         items
             .iter()
@@ -37,7 +42,13 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot, view: &Vie
                         " ".to_owned()
                     },
                     process.pid.to_string(),
-                    format!("{:.1} ms/s", process.gpu_time_ms_per_s),
+                    gpu_time(snapshot, process.gpu_time_ms_per_s),
+                    if process.cpu_percent >= 0.05 {
+                        format!("{:.1}%", process.cpu_percent)
+                    } else {
+                        "—".into()
+                    },
+                    bytes(process.memory_bytes),
                     process.command.clone(),
                 ])
                 .style(if view.marked.contains(&process.pid) {
@@ -49,7 +60,7 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot, view: &Vie
             .collect()
     };
     let sort = match view.sort_key {
-        SortKey::Gpu => "GPU time",
+        SortKey::Gpu => "GPU/CPU",
         SortKey::Pid => "PID",
     };
     let filter = if view.filter.is_empty() {
@@ -57,13 +68,18 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot, view: &Vie
     } else {
         format!("  filter:{}", view.filter)
     };
+    let gpu_status = if snapshot.status.gpu_process_error.is_some() {
+        "  GPU time:N/A"
+    } else {
+        ""
+    };
     let title = format!(
-        " GPU Active Processes {}  sort:{sort}{filter} ",
+        " ACTIVE USER JOBS {}  sort:{sort}{filter}{gpu_status} ",
         items.len()
     );
     let table = Table::new(rows, widths)
         .header(
-            Row::new([" ", "PID", "GPU TIME", "COMMAND"]).style(
+            Row::new([" ", "PID", "GPU TIME", "CPU", "UMEM", "COMMAND"]).style(
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
@@ -82,4 +98,14 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot, view: &Vie
         Some(view.selected.min(items.len() - 1))
     });
     frame.render_stateful_widget(table, area, &mut state);
+}
+
+fn gpu_time(snapshot: &Snapshot, value: f64) -> String {
+    if snapshot.status.gpu_process_error.is_some() {
+        "N/A".into()
+    } else if value > 0.0 {
+        format!("{value:.1} ms/s")
+    } else {
+        "—".into()
+    }
 }

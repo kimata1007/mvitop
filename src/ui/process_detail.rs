@@ -15,13 +15,13 @@ pub fn render_detail(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot, vie
         .and_then(|pid| snapshot.processes.iter().find(|process| process.pid == pid))
         .or_else(|| items.get(view.selected).copied());
     let content = process.map(|process| format!(
-        "PID / PPID     {} / {}\nGPU time       {:.1} ms/s\nExecutable     {}\nCommand        {}\nUser           {}\nState          {}\nCPU            {:.1}%\nMemory         {} ({:.2}%)\nThreads        {}\nRuntime        {}\nStart time     {}\nWorking dir    {}",
-        process.pid, process.ppid, process.gpu_time_ms_per_s, fallback(&process.executable), process.command, process.user, process.state.short(), process.cpu_percent, bytes(process.memory_bytes), process.memory_percent, process.threads, duration(process.runtime), process.start_time.map(crate::ui::system_time).unwrap_or_else(|| "N/A".into()), process.cwd.as_deref().unwrap_or("N/A (permission/API)")
+        "Job PID / PPID {} / {}\nProcesses       {}\nGPU time        {}\nExecutable      {}\nCommand         {}\nUser            {}\nState           {}\nCPU total       {:.1}%\nUnified memory  {} ({:.2}%)\nThreads total   {}\nRuntime         {}\nStart time      {}\nWorking dir     {}",
+        process.pid, process.ppid, process.member_count, gpu_time(snapshot, process.gpu_time_ms_per_s), fallback(&process.executable), process.command, process.user, process.state.short(), process.cpu_percent, bytes(process.memory_bytes), process.memory_percent, process.threads, duration(process.runtime), process.start_time.map(crate::ui::system_time).unwrap_or_else(|| "N/A".into()), process.cwd.as_deref().unwrap_or("N/A (permission/API)")
     )).unwrap_or_else(|| "Process is no longer available.".to_owned());
     frame.render_widget(
         Paragraph::new(content).wrap(Wrap { trim: false }).block(
             Block::default()
-                .title(" Process detail — Esc to close ")
+                .title(" User job detail — Esc to close ")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Cyan)),
         ),
@@ -53,10 +53,7 @@ pub fn render_signal(frame: &mut Frame<'_>, area: Rect, view: &ViewState) {
                 Span::raw(format!("  {description}")),
             ]))
         });
-    let title = format!(
-        " Confirm signal to {} process(es) ",
-        view.signal_targets.len()
-    );
+    let title = format!(" Confirm signal to {} job(s) ", view.signal_targets.len());
     let footer = Paragraph::new("↑/↓ select · Enter sends · Esc cancels")
         .style(Style::default().fg(Color::Yellow));
     let inner = Rect {
@@ -86,4 +83,14 @@ pub fn render_signal(frame: &mut Frame<'_>, area: Rect, view: &ViewState) {
 
 fn fallback(value: &str) -> &str {
     if value.is_empty() { "N/A" } else { value }
+}
+
+fn gpu_time(snapshot: &Snapshot, value: f64) -> String {
+    if snapshot.status.gpu_process_error.is_some() {
+        "N/A".into()
+    } else if value > 0.0 {
+        format!("{value:.1} ms/s")
+    } else {
+        "—".into()
+    }
 }
