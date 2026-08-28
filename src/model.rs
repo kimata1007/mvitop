@@ -137,8 +137,30 @@ impl History {
     pub fn iter(&self) -> impl Iterator<Item = &f64> {
         self.values.iter()
     }
+    pub fn recent(&self, limit: usize) -> impl Iterator<Item = &f64> {
+        self.values
+            .iter()
+            .skip(self.values.len().saturating_sub(limit))
+    }
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
+    }
+    pub fn summary(&self, limit: usize) -> Option<(f64, f64)> {
+        let mut count = 0usize;
+        let mut sum = 0.0;
+        let mut peak = 0.0f64;
+        for value in self.recent(limit) {
+            count += 1;
+            sum += value;
+            peak = peak.max(*value);
+        }
+        (count > 0).then(|| (sum / count as f64, peak))
     }
 }
 
@@ -222,5 +244,16 @@ mod tests {
             history.iter().copied().collect::<Vec<_>>(),
             vec![0.0, 100.0]
         );
+    }
+
+    #[test]
+    fn history_summarizes_the_visible_tail() {
+        let mut history = History::new(4);
+        for value in [10.0, 20.0, 30.0, 40.0] {
+            history.push(value);
+        }
+        assert_eq!(history.len(), 4);
+        assert_eq!(history.summary(2), Some((35.0, 40.0)));
+        assert_eq!(history.summary(0), None);
     }
 }
