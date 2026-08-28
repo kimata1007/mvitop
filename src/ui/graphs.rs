@@ -116,6 +116,14 @@ fn chart_data(history: &History, width: usize) -> Vec<Option<u64>> {
     }
     let values = history.iter().copied().collect::<Vec<_>>();
     if values.len() <= width {
+        if values.len() == history.capacity() && values.len() < width {
+            return (0..width)
+                .map(|column| {
+                    let index = column * values.len() / width;
+                    Some(values[index].round() as u64)
+                })
+                .collect();
+        }
         let mut data = vec![None; width - values.len()];
         data.extend(values.into_iter().map(|value| Some(value.round() as u64)));
         return data;
@@ -167,6 +175,17 @@ mod tests {
             history.push(value);
         }
         assert_eq!(chart_data(&history, 2), vec![Some(90), Some(30)]);
+    }
+
+    #[test]
+    fn stretches_a_full_ring_across_a_wider_chart() {
+        let mut history = History::new(2);
+        history.push(10.0);
+        history.push(20.0);
+        assert_eq!(
+            chart_data(&history, 4),
+            vec![Some(10), Some(10), Some(20), Some(20)]
+        );
     }
 
     #[test]

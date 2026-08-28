@@ -25,9 +25,9 @@ impl DemoRuntime {
         Self {
             started: Instant::now(),
             sequence: 0,
-            cpu_history: History::default(),
-            gpu_history: History::default(),
-            memory_history: History::default(),
+            cpu_history: synthetic_history(30.0, 16.0, 1.25),
+            gpu_history: synthetic_history(64.0, 22.0, 0.85),
+            memory_history: synthetic_history(42.0, 3.0, 0.3),
         }
     }
 
@@ -88,6 +88,15 @@ impl DemoRuntime {
             ..Snapshot::default()
         })
     }
+}
+
+fn synthetic_history(center: f64, amplitude: f64, speed: f64) -> History {
+    let mut history = History::default();
+    for sample in 0..history.capacity() {
+        let phase = (sample as f64 + 1.0 - history.capacity() as f64) * 0.5;
+        history.push(wave(phase, center, amplitude, speed));
+    }
+    history
 }
 
 fn wave(phase: f64, center: f64, amplitude: f64, speed: f64) -> f64 {
@@ -181,6 +190,7 @@ mod tests {
         let mut runtime = DemoRuntime::new();
         let snapshot = runtime.snapshot();
         assert_eq!(snapshot.system.model, "Demo Mac");
+        assert_eq!(snapshot.cpu.history.len(), snapshot.cpu.history.capacity());
         assert!(
             snapshot
                 .processes

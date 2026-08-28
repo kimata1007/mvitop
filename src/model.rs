@@ -145,6 +145,9 @@ impl History {
     pub fn len(&self) -> usize {
         self.values.len()
     }
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
