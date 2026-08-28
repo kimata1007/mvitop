@@ -5,22 +5,38 @@ pub mod help;
 pub mod process_detail;
 pub mod processes;
 
+use crate::metrics::process::visible;
 use crate::model::{Screen, Snapshot, ViewState};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LayoutMode {
+    Full,
+    Compact,
+    Minimal,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct MainLayout {
+    mode: LayoutMode,
+    header: Rect,
+    meters: Rect,
+    histories: Option<Rect>,
+    processes: Rect,
+    footer: Rect,
+}
+
 pub fn render(frame: &mut Frame<'_>, snapshot: &Snapshot, view: &ViewState) {
     let area = frame.area();
-    let (show_graphs, chunks) = main_layout(area);
-    header::render(frame, chunks[0], snapshot);
-    device::render(frame, chunks[1], snapshot);
-    let (process_area, footer_index) = if show_graphs {
-        graphs::render(frame, chunks[2], snapshot);
-        (chunks[3], 4)
-    } else {
-        (chunks[2], 3)
-    };
-    processes::render(frame, process_area, snapshot, view);
+    let process_count = visible(&snapshot.processes, &view.filter, view.sort_key).len();
+    let layout = main_layout(area, process_count);
+    header::render(frame, layout.header, snapshot);
+    device::render(frame, layout.meters, snapshot);
+    if let Some(histories) = layout.histories {
+        graphs::render(frame, histories, snapshot);
+    }
+    processes::render(frame, layout.processes, snapshot, view);
     let message = if view.editing_filter {
         format!(" filter: {}_", view.filter)
     } else if let Some(message) = &view.message {
@@ -34,7 +50,7 @@ pub fn render(frame: &mut Frame<'_>, snapshot: &Snapshot, view: &ViewState) {
     frame.render_widget(
         ratatui::widgets::Paragraph::new(message)
             .style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray)),
-        chunks[footer_index],
+        layout.footer,
     );
 
     match view.screen {
@@ -47,29 +63,91 @@ pub fn render(frame: &mut Frame<'_>, snapshot: &Snapshot, view: &ViewState) {
     }
 }
 
-fn main_layout(area: Rect) -> (bool, Vec<Rect>) {
-    let show_graphs = area.height >= 28 && area.width >= 60;
-    let rows = if show_graphs {
-        vec![
-            Constraint::Length(3),
-            Constraint::Length(7),
-            Constraint::Min(8),
-            Constraint::Length(9),
-            Constraint::Length(1),
-        ]
-    } else {
-        vec![
-            Constraint::Length(3),
-            Constraint::Min(7),
-            Constraint::Length(8),
-            Constraint::Length(1),
-        ]
+fn main_layout(area: Rect, process_count: usize) -> MainLayout {
+    let mode = layout_mode(area);
+    let footer_height = u16::from(area.height > 0);
+
+    if mode == LayoutMode::Minimal {
+        let header_height = match area.height {
+            0..=4 => 1,
+            5..=9 => 2,
+            _ => 3,
+        };
+        let meter_height = match area.height {
+            0..=3 => 0,
+            4..=9 => 3,
+            _ => 5,
+        };
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(header_height),
+                Constraint::Length(meter_height),
+                Constraint::Min(0),
+                Constraint::Length(footer_height),
+            ])
+            .split(area);
+        return MainLayout {
+            mode,
+            header: chunks[0],
+            meters: chunks[1],
+            histories: None,
+            processes: chunks[2],
+            footer: chunks[3],
+        };
+    }
+
+    let header_height = 3;
+    let meter_height = 5;
+    let graph_minimum = match mode {
+        LayoutMode::Full => 12,
+        LayoutMode::Compact => 9,
+        LayoutMode::Minimal => unreachable!(),
     };
+    let process_maximum = match mode {
+        LayoutMode::Full => 10,
+        LayoutMode::Compact => 6,
+        LayoutMode::Minimal => unreachable!(),
+    };
+    let desired_process_height = if process_count == 0 {
+        3
+    } else {
+        (process_count as u16)
+            .saturating_add(3)
+            .clamp(4, process_maximum)
+    };
+    let available_process_height = area
+        .height
+        .saturating_sub(header_height + meter_height + graph_minimum + footer_height);
+    let process_height = desired_process_height.min(available_process_height);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints(rows)
+        .constraints([
+            Constraint::Length(header_height),
+            Constraint::Length(meter_height),
+            Constraint::Min(graph_minimum),
+            Constraint::Length(process_height),
+            Constraint::Length(footer_height),
+        ])
         .split(area);
-    (show_graphs, chunks.to_vec())
+    MainLayout {
+        mode,
+        header: chunks[0],
+        meters: chunks[1],
+        histories: Some(chunks[2]),
+        processes: chunks[3],
+        footer: chunks[4],
+    }
+}
+
+fn layout_mode(area: Rect) -> LayoutMode {
+    if area.width < 50 || area.height < 22 {
+        LayoutMode::Minimal
+    } else if area.height < 34 {
+        LayoutMode::Compact
+    } else {
+        LayoutMode::Full
+    }
 }
 
 pub fn refresh_millis(view: &ViewState) -> u64 {
@@ -175,15 +253,28 @@ mod tests {
 
     #[test]
     fn prioritizes_metrics_over_the_job_table() {
-        let (show_graphs, large) = main_layout(Rect::new(0, 0, 120, 40));
-        assert!(show_graphs);
-        assert_eq!(large[1].height, 7);
-        assert!(large[2].height >= 8);
-        assert_eq!(large[3].height, 9);
+        let large = main_layout(Rect::new(0, 0, 120, 40), 0);
+        assert_eq!(large.mode, LayoutMode::Full);
+        assert_eq!(large.meters.height, 5);
+        assert!(large.histories.unwrap().height >= 12);
+        assert_eq!(large.processes.height, 3);
 
-        let (show_graphs, compact) = main_layout(Rect::new(0, 0, 80, 24));
-        assert!(!show_graphs);
-        assert!(compact[1].height >= 7);
-        assert_eq!(compact[2].height, 8);
+        let compact = main_layout(Rect::new(0, 0, 80, 24), 12);
+        assert_eq!(compact.mode, LayoutMode::Compact);
+        assert_eq!(compact.histories.unwrap().height, 9);
+        assert_eq!(compact.processes.height, 6);
+
+        let minimal = main_layout(Rect::new(0, 0, 60, 20), 0);
+        assert_eq!(minimal.mode, LayoutMode::Minimal);
+        assert!(minimal.histories.is_none());
+    }
+
+    #[test]
+    fn empty_job_panel_stays_collapsed() {
+        let empty = main_layout(Rect::new(0, 0, 120, 40), 0);
+        let busy = main_layout(Rect::new(0, 0, 120, 40), 20);
+        assert_eq!(empty.processes.height, 3);
+        assert_eq!(busy.processes.height, 10);
+        assert!(empty.histories.unwrap().height > busy.histories.unwrap().height);
     }
 }
