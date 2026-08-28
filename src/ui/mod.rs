@@ -36,7 +36,7 @@ pub fn render(frame: &mut Frame<'_>, snapshot: &Snapshot, view: &ViewState) {
     if let Some(histories) = layout.histories {
         graphs::render(frame, histories, snapshot, layout.mode);
     }
-    processes::render(frame, layout.processes, snapshot, view);
+    processes::render(frame, layout.processes, snapshot, view, layout.mode);
     let message = if view.editing_filter {
         format!(" filter: {}_", view.filter)
     } else if let Some(message) = &view.message {
