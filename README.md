@@ -4,7 +4,7 @@
 
 ![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange)
 ![Platform](https://img.shields.io/badge/platform-Apple%20Silicon%20macOS-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-blue)
+![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 <p align="center">
   <img src="docs/mvitop-demo.gif" alt="mvitop terminal interface demo" width="100%">
@@ -17,7 +17,7 @@
 
 `mvitop` is not a port, fork, translation, or derivative implementation of either codebase. No nvtop or nvitop source code was copied, adapted, linked, or included as a dependency. The implementation was designed and written from scratch in Rust using Ratatui, Crossterm, and macOS-native Mach, libproc, sysctl, and IOKit interfaces.
 
-The MIT license in this repository applies to mvitop's independently authored code; it is not a relicensing of either project. nvtop is distributed under GPL-3.0-or-later, while nvitop's CLI/TUI is GPL-3.0 and its API components are Apache-2.0. Their copyrights, names, and licenses remain with their respective projects.
+The GPL-3.0-only license in this repository applies to mvitop's independently authored code; it is not a relicensing of either project. nvtop is distributed under GPL-3.0-or-later, while nvitop's CLI/TUI is GPL-3.0 and its API components are Apache-2.0. Their copyrights, names, and licenses remain with their respective projects.
 
 ## Features
 
@@ -172,4 +172,8 @@ If cross-repository dispatch is temporarily unavailable, the tap's scheduled upd
 
 ## License
 
-MIT
+Copyright (c) 2026 kimata1007.
+
+`mvitop` is free software licensed under the [GNU General Public License, version 3 only](LICENSE).
+
+Releases through v0.3.0 were published under the MIT License. GPL-3.0-only applies to the current source tree and subsequent releases; it does not revoke permissions already granted for earlier releases.
