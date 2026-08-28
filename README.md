@@ -4,20 +4,20 @@
 
 ![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange)
 ![Platform](https://img.shields.io/badge/platform-Apple%20Silicon%20macOS-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-blue)
+![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 <p align="center">
   <img src="docs/mvitop-demo.gif" alt="mvitop terminal interface demo" width="100%">
 </p>
 <p align="center"><sub>Recorded from <code>mvitop --demo</code> with synthetic metrics and jobs. No host or personal data is included.</sub></p>
 
-## Inspiration and independent implementation
+## Inspiration and acknowledgements
 
-`mvitop` takes product and UX inspiration from [nvtop](https://github.com/Syllo/nvtop) and [nvitop](https://github.com/XuehaiPan/nvitop): in particular, their dense at-a-glance terminal layouts, familiar top-style process tables, and keyboard-first workflows.
+`mvitop` is proudly inspired by [nvtop](https://github.com/Syllo/nvtop) and [nvitop](https://github.com/XuehaiPan/nvitop). Those projects demonstrated how effective a dense, keyboard-first terminal interface can be for understanding GPU activity, resource history, and the processes responsible for a workload.
 
-`mvitop` is not a port, fork, translation, or derivative implementation of either codebase. No nvtop or nvitop source code was copied, adapted, linked, or included as a dependency. The implementation was designed and written from scratch in Rust using Ratatui, Crossterm, and macOS-native Mach, libproc, sysctl, and IOKit interfaces.
+Their work informs mvitop's product direction: at-a-glance numerical summaries, compact history graphs, responsive terminal layouts, top-style process tables, and keyboard-driven inspection. mvitop applies those ideas to Apple Silicon's different architecture, including a single integrated SoC, unified memory, macOS-native metrics, and a deliberately focused foreground-job view.
 
-The MIT license in this repository applies to mvitop's independently authored code; it is not a relicensing of either project. nvtop is distributed under GPL-3.0-or-later, while nvitop's CLI/TUI is GPL-3.0 and its API components are Apache-2.0. Their copyrights, names, and licenses remain with their respective projects.
+The current mvitop implementation was independently authored in Rust with Ratatui, Crossterm, and macOS-native Mach, libproc, sysctl, and IOKit interfaces. mvitop is licensed under GPL-3.0-only so that improvements to the distributed program remain available to its users and contributors. See [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md) for project-specific credits and license notes.
 
 ## Features
 
@@ -172,4 +172,8 @@ If cross-repository dispatch is temporarily unavailable, the tap's scheduled upd
 
 ## License
 
-MIT
+Copyright (c) 2026 kimata1007.
+
+`mvitop` is free software licensed under the [GNU General Public License, version 3 only](LICENSE).
+
+Releases through v0.3.0 were published under the MIT License. GPL-3.0-only applies to the current source tree and subsequent releases; it does not revoke permissions already granted for earlier releases.
