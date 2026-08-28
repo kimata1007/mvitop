@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0](https://github.com/kimata1007/mvitop/compare/v0.3.0...v0.4.0) (2026-08-28)
+
+
+### Features
+
+* redesign the adaptive monitoring interface ([a0ac7fc](https://github.com/kimata1007/mvitop/commit/a0ac7fc97e27814fa8b30ed8ecb1ae96ba6a2cbd))
+* **ui:** adapt active jobs table to terminal width ([b6741c6](https://github.com/kimata1007/mvitop/commit/b6741c6dd4f2d7c31e807e491a8bb2b1071252ea))
+* **ui:** add adaptive vertical layout ([4588e3c](https://github.com/kimata1007/mvitop/commit/4588e3c4deef7f91cd5530508d2a3b2f0af4bf4a))
+* **ui:** stack dense full-width histories ([8041dd4](https://github.com/kimata1007/mvitop/commit/8041dd461f33e219d0fdfe9bd0a902b070769db7))
+* **ui:** summarize current average and peak usage ([bd26158](https://github.com/kimata1007/mvitop/commit/bd261588866cc70e06d4fe2d6c1600edb80ac404))
+
+
+### Bug Fixes
+
+* **ui:** fill wide histories after ring saturation ([74042e4](https://github.com/kimata1007/mvitop/commit/74042e40f3b34ef1fa2117b436b80ae321db5761))
+* **ui:** polish narrow and startup layouts ([06af886](https://github.com/kimata1007/mvitop/commit/06af8863552df2db0ea78f8230d9f6e67121e420))
+
 ## [0.3.0](https://github.com/kimata1007/mvitop/compare/v0.2.0...v0.3.0) (2026-08-28)
 
 
