@@ -21,16 +21,17 @@ The current mvitop implementation was independently authored in Rust with Ratatu
 
 ## Features
 
-- Clear CPU utilization, GPU utilization, and unified-memory gauges
+- Clear CPU utilization, GPU utilization, and unified-memory gauges with current, average, and peak values
 - Total and per-core CPU utilization, including P/E core counts when macOS publishes them
 - Apple-style unified memory details: used, available, wired, cached, compressed, and swap
 - Real Apple GPU device, renderer, and tiler utilization when the driver publishes `PerformanceStatistics`
 - A focused job table containing only active foreground commands launched from an interactive terminal
 - CPU, GPU time, and unified memory aggregated across each job's child processes
 - PID, command, filter, details, marking, and safe signal confirmation for job roots
-- Fixed-size CPU utilization, GPU utilization, and unified-memory histories
-- A compact job pane that leaves more room for gauges and history graphs
-- Responsive layouts for small terminals
+- Three full-width CPU, GPU, and unified-memory histories with real time axes and peak-preserving compression
+- An adaptive job table that exposes `GPU ms/s` and runtime on wide terminals, then removes secondary columns as space narrows
+- A job pane that grows with active work and collapses to three rows when no foreground jobs are running
+- Full, compact, and minimal layouts selected automatically from the terminal dimensions
 - The TUI stays unprivileged; only the fixed `powermetrics` child command runs through `sudo`
 - Terminal restoration on normal exit, error, panic, SIGINT, and SIGTERM
 
