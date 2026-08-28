@@ -248,6 +248,7 @@ pub fn system_time(value: std::time::SystemTime) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::demo::DemoRuntime;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     #[test]
@@ -308,5 +309,45 @@ mod tests {
         assert!(footer_message(&view, 120).contains("signal[k]"));
         assert!(!footer_message(&view, 60).contains("signal[k]"));
         assert_eq!(footer_message(&view, 30), " q quit  ? help  / filter");
+    }
+
+    #[test]
+    fn adaptive_modes_keep_their_essential_information() {
+        let full = render_demo(120, 40);
+        assert!(full.contains("CPU HISTORY"));
+        assert!(full.contains("GPU ms/s"));
+        assert!(full.contains("TIME"));
+
+        let compact = render_demo(80, 24);
+        assert!(compact.contains("GPU ms/s"));
+        assert!(!compact.contains("TIME"));
+        assert!(compact.contains("avg"));
+
+        let minimal = render_demo(60, 20);
+        assert!(minimal.contains("GPU ms/s"));
+        assert!(!minimal.contains("HISTORY"));
+        assert!(!minimal.contains("UMEM"));
+
+        let tiny = render_demo(30, 8);
+        assert!(tiny.contains("mvitop"));
+        assert!(tiny.contains("q quit"));
+    }
+
+    fn render_demo(width: u16, height: u16) -> String {
+        let mut demo = DemoRuntime::new();
+        let snapshot = demo.snapshot();
+        let backend = TestBackend::new(width, height);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| render(frame, &snapshot, &ViewState::default()))
+            .unwrap();
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .chunks(width as usize)
+            .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
