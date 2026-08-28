@@ -70,7 +70,7 @@ fn render_one(
         .title_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
         .borders(Borders::TOP | Borders::BOTTOM)
         .border_style(Style::default().fg(Color::DarkGray));
-    if area.width >= 30 && area.height >= 3 {
+    if !history.is_empty() && area.width >= 30 && area.height >= 3 {
         block = block
             .title_bottom(Line::from(format!(" -{} ", age(history_duration))).left_aligned())
             .title_bottom(Line::from(format!(" -{} ", age(history_duration / 2))).centered())

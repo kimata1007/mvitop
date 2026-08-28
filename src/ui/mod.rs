@@ -37,16 +37,7 @@ pub fn render(frame: &mut Frame<'_>, snapshot: &Snapshot, view: &ViewState) {
         graphs::render(frame, histories, snapshot, layout.mode);
     }
     processes::render(frame, layout.processes, snapshot, view, layout.mode);
-    let message = if view.editing_filter {
-        format!(" filter: {}_", view.filter)
-    } else if let Some(message) = &view.message {
-        format!(" {message}")
-    } else {
-        format!(
-            " q quit  ? help  / filter  sort[g/p]  detail[Enter]  signal[k]  refresh[r] {}ms",
-            refresh_millis(view)
-        )
-    };
+    let message = footer_message(view, area.width);
     frame.render_widget(
         ratatui::widgets::Paragraph::new(message)
             .style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray)),
@@ -78,12 +69,22 @@ fn main_layout(area: Rect, process_count: usize) -> MainLayout {
             4..=9 => 3,
             _ => 5,
         };
+        let desired_process_height = if process_count == 0 {
+            3
+        } else {
+            (process_count as u16).saturating_add(3).clamp(4, 8)
+        };
+        let process_height = desired_process_height.min(
+            area.height
+                .saturating_sub(header_height + meter_height + footer_height),
+        );
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(header_height),
                 Constraint::Length(meter_height),
                 Constraint::Min(0),
+                Constraint::Length(process_height),
                 Constraint::Length(footer_height),
             ])
             .split(area);
@@ -92,8 +93,8 @@ fn main_layout(area: Rect, process_count: usize) -> MainLayout {
             header: chunks[0],
             meters: chunks[1],
             histories: None,
-            processes: chunks[2],
-            footer: chunks[3],
+            processes: chunks[3],
+            footer: chunks[4],
         };
     }
 
@@ -152,6 +153,28 @@ fn layout_mode(area: Rect) -> LayoutMode {
 
 pub fn refresh_millis(view: &ViewState) -> u64 {
     [100, 200, 500, 1_000][view.refresh_rate_index % 4]
+}
+
+fn footer_message(view: &ViewState, width: u16) -> String {
+    if view.editing_filter {
+        return format!(" filter: {}_", view.filter);
+    }
+    if let Some(message) = &view.message {
+        return format!(" {message}");
+    }
+    if width >= 100 {
+        format!(
+            " q quit  ? help  / filter  sort[g/p]  detail[Enter]  signal[k]  refresh[r] {}ms",
+            refresh_millis(view)
+        )
+    } else if width >= 55 {
+        format!(
+            " q quit  ? help  / filter  sort[g/p]  detail[Enter]  refresh {}ms",
+            refresh_millis(view)
+        )
+    } else {
+        " q quit  ? help  / filter".into()
+    }
 }
 
 fn centered(area: Rect, width: u16, height: u16) -> Rect {
@@ -267,6 +290,7 @@ mod tests {
         let minimal = main_layout(Rect::new(0, 0, 60, 20), 0);
         assert_eq!(minimal.mode, LayoutMode::Minimal);
         assert!(minimal.histories.is_none());
+        assert_eq!(minimal.processes.height, 3);
     }
 
     #[test]
@@ -276,5 +300,13 @@ mod tests {
         assert_eq!(empty.processes.height, 3);
         assert_eq!(busy.processes.height, 10);
         assert!(empty.histories.unwrap().height > busy.histories.unwrap().height);
+    }
+
+    #[test]
+    fn footer_hides_secondary_actions_when_narrow() {
+        let view = ViewState::default();
+        assert!(footer_message(&view, 120).contains("signal[k]"));
+        assert!(!footer_message(&view, 60).contains("signal[k]"));
+        assert_eq!(footer_message(&view, 30), " q quit  ? help  / filter");
     }
 }

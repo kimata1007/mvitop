@@ -33,7 +33,7 @@ pub fn render(frame: &mut Frame<'_>, area: Rect, snapshot: &Snapshot) {
         (Some(p), Some(e)) => format!(" P:{p} E:{e}"),
         _ => String::new(),
     };
-    let per_core = if area.width >= 100 && !snapshot.cpu.per_core_percent.is_empty() {
+    let per_core = if area.width >= 150 && !snapshot.cpu.per_core_percent.is_empty() {
         let values = snapshot
             .cpu
             .per_core_percent
