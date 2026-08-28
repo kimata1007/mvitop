@@ -10,9 +10,9 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime};
 
-const CPU_INTERVAL: Duration = Duration::from_millis(500);
-const MEMORY_INTERVAL: Duration = Duration::from_millis(500);
-const GPU_INTERVAL: Duration = Duration::from_millis(350);
+pub(crate) const CPU_INTERVAL: Duration = Duration::from_millis(500);
+pub(crate) const MEMORY_INTERVAL: Duration = Duration::from_millis(500);
+pub(crate) const GPU_INTERVAL: Duration = Duration::from_millis(350);
 const PROCESS_INTERVAL: Duration = Duration::from_secs(1);
 const SLOW_INTERVAL: Duration = Duration::from_secs(15);
 

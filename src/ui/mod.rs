@@ -34,7 +34,7 @@ pub fn render(frame: &mut Frame<'_>, snapshot: &Snapshot, view: &ViewState) {
     header::render(frame, layout.header, snapshot);
     device::render(frame, layout.meters, snapshot);
     if let Some(histories) = layout.histories {
-        graphs::render(frame, histories, snapshot);
+        graphs::render(frame, histories, snapshot, layout.mode);
     }
     processes::render(frame, layout.processes, snapshot, view);
     let message = if view.editing_filter {
